@@ -17,6 +17,8 @@ import java.util.List;
 
 public final class DiagnosticsActivity extends Activity {
     private LinearLayout list;
+    private TextView status;
+    private Button toggleCapture;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -33,6 +35,18 @@ public final class DiagnosticsActivity extends Activity {
         TextView title = text("Logs & Diagnostics", 24, Typeface.BOLD);
         root.addView(title);
         root.addView(text("BanjoRecomp keeps the five newest diagnostic sessions. Tap a log to share it.", 14, Typeface.NORMAL));
+
+        status = text("", 14, Typeface.NORMAL);
+        root.addView(status);
+
+        toggleCapture = new Button(this);
+        toggleCapture.setAllCaps(false);
+        toggleCapture.setOnClickListener(v -> {
+            boolean enable = !DiagnosticsLogger.isEnabled(this);
+            DiagnosticsLogger.setEnabled(this, enable);
+            refresh();
+        });
+        root.addView(toggleCapture);
 
         Button shareCurrent = new Button(this);
         shareCurrent.setText("Share current session log");
@@ -77,6 +91,23 @@ public final class DiagnosticsActivity extends Activity {
 
     private void refresh() {
         if (list == null) return;
+
+        boolean enabled = DiagnosticsLogger.isEnabled(this);
+        File current = DiagnosticsLogger.currentSessionFile();
+        if (status != null) {
+            if (enabled && current != null) {
+                status.setText("Capture ON — current session: " + current.getName()
+                        + " (" + humanSize(current.length()) + ")");
+            } else if (enabled) {
+                status.setText("Capture ON — session will start when the game activity runs.");
+            } else {
+                status.setText("Capture OFF — logcat and crash session capture are disabled.");
+            }
+        }
+        if (toggleCapture != null) {
+            toggleCapture.setText(enabled ? "Turn diagnostic capture OFF" : "Turn diagnostic capture ON");
+        }
+
         list.removeAllViews();
         List<File> files = DiagnosticsLogger.listLogFiles(this);
         int count = Math.min(5, files.size());
