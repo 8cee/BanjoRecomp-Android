@@ -97,6 +97,7 @@ public class BanjoSDLActivity extends SDLActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        DiagnosticsLogger.start(this);
         currentActivity = this;
         lastPostedDualScreenGameplayActive = null;
         lastPostedDualScreenStats = null;
@@ -212,6 +213,7 @@ public class BanjoSDLActivity extends SDLActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        DiagnosticsLogger.mark("onResume");
         applyImmersiveFullscreen();
         activityResumed = true;
         updateAppAudioActive();
@@ -220,6 +222,7 @@ public class BanjoSDLActivity extends SDLActivity {
 
     @Override
     protected void onPause() {
+        DiagnosticsLogger.mark("onPause");
         synchronizeSaveFolder();
         activityResumed = false;
         updateAppAudioActive();
@@ -271,6 +274,7 @@ public class BanjoSDLActivity extends SDLActivity {
 
     @Override
     protected void onDestroy() {
+        DiagnosticsLogger.stop("onDestroy");
         if (dualScreenStatsManager != null) {
             dualScreenStatsManager.stop();
             dualScreenStatsManager = null;
