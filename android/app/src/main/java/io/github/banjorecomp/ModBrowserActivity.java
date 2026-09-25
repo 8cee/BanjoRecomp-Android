@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Gravity;
@@ -13,6 +14,9 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
+import android.widget.Spinner;
+import android.widget.ArrayAdapter;
+import android.widget.AdapterView;
 import android.widget.TextView;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -51,6 +55,7 @@ public final class ModBrowserActivity extends Activity {
     private ProgressBar progress;
     private EditText search;
     private JSONArray currentCatalog;
+    private Spinner typeFilter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -110,6 +115,22 @@ public final class ModBrowserActivity extends Activity {
             @Override public void afterTextChanged(Editable s) {}
         });
         root.addView(search, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        typeFilter = new Spinner(this);
+        String[] types = new String[] {"All", "mod", "texture", "audio", "translation", "gameplay"};
+        ArrayAdapter<String> typeAdapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, types);
+        typeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        typeFilter.setAdapter(typeAdapter);
+        typeFilter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (currentCatalog != null) showCatalog(currentCatalog, false);
+            }
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
+        });
+        root.addView(typeFilter, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT));
 
@@ -180,15 +201,21 @@ public final class ModBrowserActivity extends Activity {
         }
 
         String query = search == null ? "" : search.getText().toString().trim().toLowerCase(Locale.US);
+        String selectedType = typeFilter == null || typeFilter.getSelectedItem() == null
+                ? "All" : typeFilter.getSelectedItem().toString();
         int shown = 0;
         for (int i = 0; i < mods.length(); i++) {
             JSONObject mod = mods.optJSONObject(i);
             if (mod == null) continue;
+            String modType = mod.optString("type", "mod").trim();
+            if (!"All".equals(selectedType) && !selectedType.equalsIgnoreCase(modType)) {
+                continue;
+            }
             if (!query.isEmpty()) {
                 String haystack = (mod.optString("name", "") + "\n"
                         + mod.optString("author", "") + "\n"
                         + mod.optString("description", "") + "\n"
-                        + mod.optString("type", "")).toLowerCase(Locale.US);
+                        + modType).toLowerCase(Locale.US);
                 if (!haystack.contains(query)) continue;
             }
             addModCard(mod);
@@ -258,6 +285,23 @@ public final class ModBrowserActivity extends Activity {
         metaView.setText(meta.toString());
         metaView.setTextColor(compatible ? Color.LTGRAY : Color.rgb(255, 180, 120));
         card.addView(metaView);
+
+        if (!homepage.isEmpty()) {
+            try {
+                URL homepageUrl = new URL(homepage);
+                if ("https".equalsIgnoreCase(homepageUrl.getProtocol())) {
+                    Button homepageButton = new Button(this);
+                    homepageButton.setText("Homepage");
+                    homepageButton.setOnClickListener(v -> {
+                        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(homepage));
+                        startActivity(intent);
+                    });
+                    card.addView(homepageButton);
+                }
+            } catch (Exception ignored) {
+                Log.w(TAG, "Ignoring invalid homepage URL for " + id);
+            }
+        }
 
         String installedVersion = null;
         try {
