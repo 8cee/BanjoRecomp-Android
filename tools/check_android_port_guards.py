@@ -127,6 +127,10 @@ def main() -> int:
     diagnostics_logger = read("android/app/src/main/java/io/github/banjorecomp/DiagnosticsLogger.java")
     require("setDefaultUncaughtExceptionHandler" in diagnostics_logger and "JAVA CRASH" in diagnostics_logger,
             "diagnostics must retain Java crash capture")
+    diagnostics_activity = read("android/app/src/main/java/io/github/banjorecomp/DiagnosticsActivity.java")
+    require("deleteArchivedLogs" in diagnostics_logger and "file.equals(current)" in diagnostics_logger
+            and '"Clear archived logs"' in diagnostics_activity and "AlertDialog.Builder" in diagnostics_activity,
+            "diagnostics must retain confirmed archived-log cleanup without deleting the current session")
     require("openDiagnostics()" in save_activity and '"android_diagnostics"' in game_config
             and '"Logs & Diagnostics"' in game_config,
             "Banjo settings must retain the in-app diagnostics action")
