@@ -9,10 +9,13 @@ import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.text.Editable;
+import android.text.TextWatcher;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -46,6 +49,8 @@ public final class ModBrowserActivity extends Activity {
     private LinearLayout modList;
     private TextView status;
     private ProgressBar progress;
+    private EditText search;
+    private JSONArray currentCatalog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -92,6 +97,22 @@ public final class ModBrowserActivity extends Activity {
 
         root.addView(header);
 
+        search = new EditText(this);
+        search.setHint("Search mods");
+        search.setSingleLine(true);
+        search.setTextColor(Color.WHITE);
+        search.setHintTextColor(Color.GRAY);
+        search.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (currentCatalog != null) showCatalog(currentCatalog, false);
+            }
+            @Override public void afterTextChanged(Editable s) {}
+        });
+        root.addView(search, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
         status = new TextView(this);
         status.setTextColor(Color.LTGRAY);
         status.setTextSize(14f);
@@ -128,7 +149,7 @@ public final class ModBrowserActivity extends Activity {
                 JSONObject root = parseCatalog(bytes);
                 writeBytesAtomically(cache, bytes);
                 JSONArray mods = root.getJSONArray("mods");
-                runOnUiThread(() -> showCatalog(mods));
+                runOnUiThread(() -> showCatalog(mods, true));
             } catch (Exception networkError) {
                 Log.e(TAG, "Catalog refresh failed", networkError);
                 try {
@@ -136,7 +157,7 @@ public final class ModBrowserActivity extends Activity {
                     JSONObject root = parseCatalog(cached);
                     JSONArray mods = root.getJSONArray("mods");
                     runOnUiThread(() -> {
-                        showCatalog(mods);
+                        showCatalog(mods, true);
                         status.setText("Offline catalog: showing last successful mod list.");
                     });
                 } catch (Exception cacheError) {
@@ -149,20 +170,34 @@ public final class ModBrowserActivity extends Activity {
         });
     }
 
-    private void showCatalog(JSONArray mods) {
+    private void showCatalog(JSONArray mods, boolean updateStatus) {
         progress.setVisibility(View.GONE);
+        currentCatalog = mods;
         modList.removeAllViews();
         if (mods.length() == 0) {
-            status.setText("The server is online, but no mods are published yet.");
+            if (updateStatus) status.setText("The server is online, but no mods are published yet.");
             return;
         }
 
-        status.setText(mods.length() + (mods.length() == 1 ? " mod available" : " mods available"));
+        String query = search == null ? "" : search.getText().toString().trim().toLowerCase(Locale.US);
+        int shown = 0;
         for (int i = 0; i < mods.length(); i++) {
             JSONObject mod = mods.optJSONObject(i);
-            if (mod != null) {
-                addModCard(mod);
+            if (mod == null) continue;
+            if (!query.isEmpty()) {
+                String haystack = (mod.optString("name", "") + "\n"
+                        + mod.optString("author", "") + "\n"
+                        + mod.optString("description", "") + "\n"
+                        + mod.optString("type", "")).toLowerCase(Locale.US);
+                if (!haystack.contains(query)) continue;
             }
+            addModCard(mod);
+            shown++;
+        }
+        if (updateStatus || !query.isEmpty()) {
+            status.setText(query.isEmpty()
+                    ? mods.length() + (mods.length() == 1 ? " mod available" : " mods available")
+                    : shown + (shown == 1 ? " matching mod" : " matching mods"));
         }
     }
 
