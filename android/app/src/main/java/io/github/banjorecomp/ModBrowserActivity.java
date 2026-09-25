@@ -38,6 +38,7 @@ public final class ModBrowserActivity extends Activity {
     private static final long MAX_CATALOG_BYTES = 2L * 1024L * 1024L;
     private static final long MAX_MOD_BYTES = 512L * 1024L * 1024L;
     private static final String CATALOG_CACHE_NAME = "mod-server-catalog.json";
+    private static final String INSTALLED_PREFS = "mod-server-installed";
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private LinearLayout modList;
@@ -193,11 +194,15 @@ public final class ModBrowserActivity extends Activity {
             card.addView(descView);
         }
 
+        String installedVersion = getSharedPreferences(INSTALLED_PREFS, MODE_PRIVATE)
+                .getString(id, null);
         Button install = new Button(this);
-        install.setText("Download & Install");
+        install.setText(installedVersion == null ? "Download & Install"
+                : installedVersion.equals(version) ? "Reinstall"
+                : "Update " + installedVersion + " → " + version);
         install.setOnClickListener(v -> {
             install.setEnabled(false);
-            downloadMod(id, name, downloadUrl, sha256, install);
+            downloadMod(id, name, version, downloadUrl, sha256, install);
         });
         card.addView(install);
 
@@ -208,7 +213,7 @@ public final class ModBrowserActivity extends Activity {
         modList.addView(card, params);
     }
 
-    private void downloadMod(String id, String name, String downloadUrl, String expectedSha256, Button installButton) {
+    private void downloadMod(String id, String name, String version, String downloadUrl, String expectedSha256, Button installButton) {
         progress.setVisibility(View.VISIBLE);
         status.setText("Downloading " + name + "…");
 
@@ -219,7 +224,7 @@ public final class ModBrowserActivity extends Activity {
                 if (!root.isDirectory() && !root.mkdirs() && !root.isDirectory()) {
                     throw new IllegalStateException("Could not create download directory");
                 }
-                destination = new File(root, sanitizeFileName(id) + ".zip");
+                destination = new File(root, sanitizeFileName(id) + extensionFor(downloadUrl));
                 downloadToFile(downloadUrl, destination, MAX_MOD_BYTES);
                 if (!expectedSha256.isEmpty()) {
                     String actual = sha256(destination);
@@ -230,6 +235,8 @@ public final class ModBrowserActivity extends Activity {
 
                 Intent result = new Intent();
                 result.putExtra(EXTRA_MOD_PATH, destination.getAbsolutePath());
+                getSharedPreferences(INSTALLED_PREFS, MODE_PRIVATE)
+                        .edit().putString(id, version).apply();
                 setResult(Activity.RESULT_OK, result);
                 runOnUiThread(() -> {
                     status.setText("Downloaded " + name + ". Opening the Banjo mod installer…");
@@ -388,6 +395,16 @@ public final class ModBrowserActivity extends Activity {
             result.append(String.format(Locale.US, "%02x", b & 0xff));
         }
         return result.toString();
+    }
+
+    private static String extensionFor(String url) {
+        try {
+            String path = new URL(url).getPath().toLowerCase(Locale.US);
+            if (path.endsWith(".nrm")) return ".nrm";
+            if (path.endsWith(".rtz")) return ".rtz";
+            if (path.endsWith(".zip")) return ".zip";
+        } catch (Exception ignored) {}
+        return ".zip";
     }
 
     private static String sanitizeFileName(String value) {
