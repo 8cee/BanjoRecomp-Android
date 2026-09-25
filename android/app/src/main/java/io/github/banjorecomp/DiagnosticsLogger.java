@@ -134,6 +134,22 @@ public final class DiagnosticsLogger {
         return out;
     }
 
+    public static int deleteArchivedLogs(Context context) {
+        synchronized (LOCK) {
+            File current = session == null ? null : session.file;
+            int deleted = 0;
+            File[] files = getDiagnosticsDir(context).listFiles();
+            if (files == null) return 0;
+            for (File file : files) {
+                if (!file.isFile() || !file.getName().endsWith(".log") || file.equals(current)) continue;
+                try {
+                    if (file.delete()) deleted++;
+                } catch (Throwable ignored) {}
+            }
+            return deleted;
+        }
+    }
+
     private static void drain(Session s, Process process) {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
             String line;
