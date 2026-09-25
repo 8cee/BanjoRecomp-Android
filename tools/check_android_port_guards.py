@@ -168,9 +168,11 @@ def main() -> int:
     require('"Search mods"' in mod_browser and "currentCatalog" in mod_browser
             and "Update available" in mod_browser,
             "mod browser must retain search/filter and installed update status")
-    require('"Homepage"' in mod_browser and '"All", "mod", "texture", "audio", "translation", "gameplay"' in mod_browser
+    require('"Homepage"' in mod_browser and "updateTypeFilterOptions" in mod_browser
+            and 'Collections.sort(types, String.CASE_INSENSITIVE_ORDER)' in mod_browser
+            and 'typeAdapter.add("All")' in mod_browser
             and "ACTION_VIEW" in mod_browser,
-            "mod browser must retain type filtering and HTTPS homepage actions")
+            "mod browser must retain dynamic type filtering and HTTPS homepage actions")
     require("protected void onResume()" in mod_browser and "refreshCatalog();" in mod_browser,
             "mod browser must refresh browser labels from native state after returning")
     require('"schema": 1' in mod_catalog and '"mods": [' in mod_catalog,
