@@ -253,6 +253,53 @@ public final class ModBrowserActivity extends Activity {
         });
         card.addView(install);
 
+        if (installedVersion != null && !installedVersion.isEmpty()) {
+            boolean enabled = false;
+            boolean autoEnabled = false;
+            try {
+                enabled = BanjoSDLActivity.nativeIsModEnabled(id);
+                autoEnabled = BanjoSDLActivity.nativeIsModAutoEnabled(id);
+            } catch (UnsatisfiedLinkError error) {
+                Log.w(TAG, "Installed mod state lookup unavailable", error);
+            }
+
+            LinearLayout actions = new LinearLayout(this);
+            actions.setOrientation(LinearLayout.HORIZONTAL);
+
+            Button toggle = new Button(this);
+            toggle.setText(autoEnabled ? "Required by Dependency" : enabled ? "Disable" : "Enable");
+            toggle.setEnabled(!autoEnabled);
+            final boolean targetEnabled = !enabled;
+            toggle.setOnClickListener(v -> {
+                try {
+                    BanjoSDLActivity.nativeSetModEnabled(id, targetEnabled);
+                    refreshCatalog();
+                } catch (UnsatisfiedLinkError error) {
+                    status.setText("Could not change mod state: native bridge unavailable");
+                }
+            });
+            actions.addView(toggle, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+            Button uninstall = new Button(this);
+            uninstall.setText("Uninstall");
+            uninstall.setOnClickListener(v -> {
+                try {
+                    boolean removed = BanjoSDLActivity.nativeUninstallMod(id);
+                    if (removed) {
+                        getSharedPreferences(DOWNLOADED_PREFS, MODE_PRIVATE).edit().remove(id).apply();
+                        status.setText("Uninstalled " + name);
+                        refreshCatalog();
+                    } else {
+                        status.setText("Could not uninstall " + name + ". It may be in use or required.");
+                    }
+                } catch (UnsatisfiedLinkError error) {
+                    status.setText("Could not uninstall: native bridge unavailable");
+                }
+            });
+            actions.addView(uninstall, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            card.addView(actions);
+        }
+
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
