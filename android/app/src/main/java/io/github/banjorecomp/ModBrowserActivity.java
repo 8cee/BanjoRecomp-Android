@@ -3,6 +3,8 @@ package io.github.banjorecomp;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
@@ -11,6 +13,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
@@ -47,6 +50,7 @@ public final class ModBrowserActivity extends Activity {
     private static final int READ_TIMEOUT_MS = 30000;
     private static final long MAX_CATALOG_BYTES = 2L * 1024L * 1024L;
     private static final long MAX_MOD_BYTES = 512L * 1024L * 1024L;
+    private static final long MAX_THUMBNAIL_BYTES = 4L * 1024L * 1024L;
     private static final String CATALOG_CACHE_NAME = "mod-server-catalog.json";
     private static final String DOWNLOADED_PREFS = "mod-server-downloaded";
     private static final String SUPPORTED_GAME_ID = "bk";
@@ -217,7 +221,7 @@ public final class ModBrowserActivity extends Activity {
             }
             if (!query.isEmpty()) {
                 String haystack = (mod.optString("name", "") + "\n"
-                        + mod.optString("author", "") + "\n"
+                        + displayAuthors(mod) + "\n"
                         + mod.optString("description", "") + "\n"
                         + modType).toLowerCase(Locale.US);
                 if (!haystack.contains(query)) continue;
@@ -278,11 +282,12 @@ public final class ModBrowserActivity extends Activity {
     private void addModCard(JSONObject mod) {
         String id = mod.optString("id", "").trim();
         String name = mod.optString("name", id).trim();
-        String author = mod.optString("author", "Unknown").trim();
+        String author = displayAuthors(mod);
         String version = mod.optString("version", "").trim();
         String description = mod.optString("description", "").trim();
         String type = mod.optString("type", "mod").trim();
         String homepage = mod.optString("homepage", "").trim();
+        String thumbnail = mod.optString("thumbnail", "").trim();
         String gameId = mod.optString("game_id", SUPPORTED_GAME_ID).trim();
         int minAppVersionCode = mod.optInt("min_app_version_code", 0);
         String downloadUrl = mod.optString("download_url", "").trim();
@@ -300,6 +305,16 @@ public final class ModBrowserActivity extends Activity {
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(14), dp(12), dp(14), dp(12));
         card.setBackgroundColor(Color.rgb(35, 41, 52));
+
+        if (!thumbnail.isEmpty()) {
+            ImageView thumbnailView = new ImageView(this);
+            thumbnailView.setAdjustViewBounds(true);
+            thumbnailView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            thumbnailView.setContentDescription(name + " thumbnail");
+            card.addView(thumbnailView, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, dp(160)));
+            loadThumbnail(thumbnail, thumbnailView, id);
+        }
 
         TextView nameView = new TextView(this);
         nameView.setText(name + (version.isEmpty() ? "" : "  v" + version));
@@ -552,12 +567,72 @@ public final class ModBrowserActivity extends Activity {
             if (!"https".equalsIgnoreCase(parsed.getProtocol())) {
                 throw new SecurityException("Catalog entry " + id + " does not use HTTPS");
             }
+            String thumbnail = mod.optString("thumbnail", "").trim();
+            if (!thumbnail.isEmpty()) {
+                URL thumbnailUrl = new URL(thumbnail);
+                if (!"https".equalsIgnoreCase(thumbnailUrl.getProtocol())) {
+                    throw new SecurityException("Catalog entry " + id + " thumbnail does not use HTTPS");
+                }
+            }
+            JSONArray authors = mod.optJSONArray("authors");
+            if (authors != null) {
+                for (int authorIndex = 0; authorIndex < authors.length(); authorIndex++) {
+                    Object author = authors.opt(authorIndex);
+                    if (author instanceof String) {
+                        if (((String) author).trim().isEmpty()) {
+                            throw new IllegalArgumentException("Catalog entry " + id + " has an empty author");
+                        }
+                    } else if (author instanceof JSONObject) {
+                        if (((JSONObject) author).optString("name", "").trim().isEmpty()) {
+                            throw new IllegalArgumentException("Catalog entry " + id + " has an author without a name");
+                        }
+                    } else {
+                        throw new IllegalArgumentException("Catalog entry " + id + " has an invalid authors entry");
+                    }
+                }
+            }
             String checksum = mod.optString("sha256", "").trim();
             if (!checksum.isEmpty() && !checksum.matches("(?i)[0-9a-f]{64}")) {
                 throw new IllegalArgumentException("Catalog entry " + id + " has an invalid SHA-256");
             }
         }
         return root;
+    }
+
+    private static String displayAuthors(JSONObject mod) {
+        JSONArray authors = mod.optJSONArray("authors");
+        if (authors == null || authors.length() == 0) {
+            String legacy = mod.optString("author", "Unknown").trim();
+            return legacy.isEmpty() ? "Unknown" : legacy;
+        }
+
+        ArrayList<String> names = new ArrayList<>();
+        for (int i = 0; i < authors.length(); i++) {
+            Object value = authors.opt(i);
+            String name = "";
+            if (value instanceof String) {
+                name = ((String) value).trim();
+            } else if (value instanceof JSONObject) {
+                name = ((JSONObject) value).optString("name", "").trim();
+            }
+            if (!name.isEmpty()) names.add(name);
+        }
+        return names.isEmpty() ? "Unknown" : android.text.TextUtils.join(", ", names);
+    }
+
+    private void loadThumbnail(String url, ImageView view, String modId) {
+        executor.execute(() -> {
+            try {
+                byte[] bytes = downloadBytes(url, MAX_THUMBNAIL_BYTES);
+                Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                if (bitmap == null) throw new IllegalArgumentException("Unsupported thumbnail image");
+                runOnUiThread(() -> {
+                    if (!isFinishing() && !isDestroyed()) view.setImageBitmap(bitmap);
+                });
+            } catch (Exception e) {
+                Log.w(TAG, "Could not load thumbnail for " + modId, e);
+            }
+        });
     }
 
     private static void writeBytesAtomically(File destination, byte[] bytes) throws Exception {
