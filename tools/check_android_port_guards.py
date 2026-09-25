@@ -120,6 +120,9 @@ def main() -> int:
             "8CEE mod browser must remain wired into BanjoSDLActivity")
     require("https://raw.githubusercontent.com/8cee/BanjoRecomp-Android/android/mod-server/index.json" in mod_browser,
             "mod browser must use the 8CEE Banjo catalog")
+    require("CATALOG_CACHE_NAME" in mod_browser and "Offline catalog" in mod_browser
+            and "parseCatalog" in mod_browser,
+            "mod browser must retain validated offline catalog fallback")
     require('"schema": 1' in mod_catalog and '"mods": [' in mod_catalog,
             "mod-server catalog must retain the supported schema")
     require('"Browse Mods"' in frontend_patch and "openModServerBrowser" in frontend_patch,
