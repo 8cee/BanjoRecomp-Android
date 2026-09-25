@@ -237,6 +237,22 @@ Java_io_github_banjorecomp_BanjoSDLActivity_nativeGetInstalledModVersion(
     return nullptr;
 }
 
+extern "C" JNIEXPORT jint JNICALL
+Java_io_github_banjorecomp_BanjoSDLActivity_nativeCompareVersions(
+    JNIEnv* env, jclass, jstring installed_version_string, jstring catalog_version_string) {
+    const std::string installed_string = android_jstring_to_string(env, installed_version_string);
+    const std::string catalog_string = android_jstring_to_string(env, catalog_version_string);
+    recomp::Version installed;
+    recomp::Version catalog;
+    if (!recomp::Version::from_string(installed_string, installed)
+            || !recomp::Version::from_string(catalog_string, catalog)) {
+        return 2;
+    }
+    if (installed < catalog) return -1;
+    if (installed > catalog) return 1;
+    return 0;
+}
+
 extern "C" JNIEXPORT jboolean JNICALL
 Java_io_github_banjorecomp_BanjoSDLActivity_nativeIsModEnabled(
     JNIEnv* env, jclass, jstring mod_id_string) {
