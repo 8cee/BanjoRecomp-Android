@@ -138,9 +138,9 @@ def main() -> int:
     require("CATALOG_CACHE_NAME" in mod_browser and "Offline catalog" in mod_browser
             and "parseCatalog" in mod_browser,
             "mod browser must retain validated offline catalog fallback")
-    require("INSTALLED_PREFS" in mod_browser and "extensionFor" in mod_browser
-            and '"Reinstall"' in mod_browser and '"Update "' in mod_browser,
-            "mod browser must preserve package type and track installed catalog versions")
+    require("DOWNLOADED_PREFS" in mod_browser and "extensionFor" in mod_browser
+            and '"Download Again"' in mod_browser and '"Download Update "' in mod_browser,
+            "mod browser must preserve package type and track last downloaded catalog versions truthfully")
     require('"schema": 1' in mod_catalog and '"mods": [' in mod_catalog,
             "mod-server catalog must retain the supported schema")
     require('"Browse Mods"' in frontend_patch and "openModServerBrowser" in frontend_patch,
