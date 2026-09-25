@@ -1197,6 +1197,7 @@ public class BanjoSDLActivity extends SDLActivity {
 
     private static native void nativeOnModsSelected(String[] paths);
     public static native String nativeGetInstalledModVersion(String modId);
+    public static native int nativeCompareVersions(String installedVersion, String catalogVersion);
     public static native boolean nativeIsModEnabled(String modId);
     public static native boolean nativeIsModAutoEnabled(String modId);
     public static native boolean nativeSetModEnabled(String modId, boolean enabled);
