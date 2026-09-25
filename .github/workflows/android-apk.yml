@@ -295,14 +295,14 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "${BANJO_ANDROID_PRIVATE_INPUTS_TOKEN:-}" && -z "${PRIVATE_INPUTS_SSH_KEY:-}" ]]; then
-            echo 'Runtime APK generation requires a private repository containing:' >&2
-            echo '  banjo.us.v10.decompressed.z64' >&2
+            echo 'Runtime APK generation requires a private repository containing your normal Banjo-Kazooie US v1.0 ROM:' >&2
+            echo '  baserom.us.v10.z64' >&2
             echo >&2
             echo "Expected repository: ${BANJO_ANDROID_PRIVATE_INPUTS_REPO}" >&2
             echo >&2
             echo 'Add either repository secret PRIVATE_REPO_TOKEN (recommended; same pattern as DK64)' >&2
             echo 'or BANJO_ANDROID_PRIVATE_INPUTS_SSH_KEY with read access to that repository.' >&2
-            echo 'The ROM is used only for source generation and is removed before APK packaging.' >&2
+            echo 'CI verifies the US v1.0 ROM, generates the decompressed image automatically, and removes ROM inputs before APK packaging.' >&2
             exit 2
           fi
 
