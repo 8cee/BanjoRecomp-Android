@@ -164,6 +164,13 @@ def main() -> int:
     require("nativeCompareVersions" in main_cpp and "Version::from_string" in main_cpp
             and "nativeCompareVersions" in save_activity,
             "mod browser must compare installed/catalog versions with runtime semantic version parsing")
+    require("validateThunderstorePackageForAndroid" in mod_browser
+            and "desktop native code" in mod_browser
+            and "ZipFile" in mod_browser,
+            "Thunderstore installs must reject desktop-native packages on Android")
+    require("nativeDisableAllMods" in main_cpp and "nativeDisableAllMods" in save_activity
+            and '"Disable mods"' in mod_browser,
+            "Android mod browser must retain disable-all recovery for crashy mods")
     require("nativeIsModEnabled" in main_cpp and "nativeSetModEnabled" in main_cpp
             and "nativeUninstallMod" in main_cpp and "nativeIsModAutoEnabled" in main_cpp,
             "native mod bridge must retain enable, dependency, and uninstall operations")
