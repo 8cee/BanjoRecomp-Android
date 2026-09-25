@@ -144,6 +144,8 @@ def main() -> int:
     require("nativeGetInstalledModVersion" in main_cpp and "nativeGetInstalledModVersion" in save_activity
             and "BanjoSDLActivity.nativeGetInstalledModVersion" in mod_browser,
             "mod browser must query native installed mod versions before labeling updates")
+    require("protected void onResume()" in mod_browser and "refreshCatalog();" in mod_browser,
+            "mod browser must refresh browser labels from native state after returning")
     require('"schema": 1' in mod_catalog and '"mods": [' in mod_catalog,
             "mod-server catalog must retain the supported schema")
     require('"Browse Mods"' in frontend_patch and "openModServerBrowser" in frontend_patch,
