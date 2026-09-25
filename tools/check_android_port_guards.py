@@ -175,6 +175,10 @@ def main() -> int:
             and 'typeAdapter.add("All")' in mod_browser
             and "ACTION_VIEW" in mod_browser,
             "mod browser must retain dynamic type filtering and HTTPS homepage actions")
+    require("displayAuthors" in mod_browser and "optJSONArray(\"authors\")" in mod_browser
+            and "thumbnail" in mod_browser and "loadThumbnail" in mod_browser
+            and "MAX_THUMBNAIL_BYTES" in mod_browser,
+            "mod browser must retain rich author metadata and bounded HTTPS thumbnails")
     require("protected void onResume()" in mod_browser and "refreshCatalog();" in mod_browser,
             "mod browser must refresh browser labels from native state after returning")
     require('"schema": 1' in mod_catalog and '"mods": [' in mod_catalog,
