@@ -172,8 +172,9 @@ def main() -> int:
             and '"Not Compatible"' in mod_browser,
             "mod catalog must retain game/app compatibility gating")
     require('"Search mods"' in mod_browser and "currentCatalog" in mod_browser
-            and "Update available" in mod_browser,
-            "mod browser must retain search/filter and installed update status")
+            and "Update available" in mod_browser and '"Updates only"' in mod_browser
+            and "hasCatalogUpdate" in mod_browser,
+            "mod browser must retain search/filter, updates-only filtering, and installed update status")
     require('"Homepage"' in mod_browser and "updateTypeFilterOptions" in mod_browser
             and 'Collections.sort(types, String.CASE_INSENSITIVE_ORDER)' in mod_browser
             and 'typeAdapter.add("All")' in mod_browser
