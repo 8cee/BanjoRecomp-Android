@@ -1220,6 +1220,7 @@ public class BanjoSDLActivity extends SDLActivity {
     public static native boolean nativeSetModEnabled(String modId, boolean enabled);
     public static native String nativeGetModUninstallBlockReason(String modId);
     public static native boolean nativeUninstallMod(String modId);
+    public static native int nativeDisableAllMods();
     private static native void nativeOnRomSelected(String path);
     private static native void nativeOnGpuDriverImported(
             String driverId,
