@@ -141,6 +141,9 @@ def main() -> int:
     require("DOWNLOADED_PREFS" in mod_browser and "extensionFor" in mod_browser
             and '"Download Again"' in mod_browser and '"Download Update "' in mod_browser,
             "mod browser must preserve package type and track last downloaded catalog versions truthfully")
+    require("nativeGetInstalledModVersion" in main_cpp and "nativeGetInstalledModVersion" in save_activity
+            and "BanjoSDLActivity.nativeGetInstalledModVersion" in mod_browser,
+            "mod browser must query native installed mod versions before labeling updates")
     require('"schema": 1' in mod_catalog and '"mods": [' in mod_catalog,
             "mod-server catalog must retain the supported schema")
     require('"Browse Mods"' in frontend_patch and "openModServerBrowser" in frontend_patch,
