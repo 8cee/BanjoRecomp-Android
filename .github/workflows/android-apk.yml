@@ -152,7 +152,7 @@ jobs:
       ANDROID_CMAKE_VERSION: '3.22.1'
       ANDROID_ABI: arm64-v8a
       ANDROID_PLATFORM: '24'
-      BANJO_ANDROID_PRIVATE_INPUTS_REPO: ${{ vars.BANJO_ANDROID_PRIVATE_INPUTS_REPO || 'AurelioB/BanjoRecomp-private-inputs' }}
+      BANJO_ANDROID_PRIVATE_INPUTS_REPO: ${{ vars.BANJO_ANDROID_PRIVATE_INPUTS_REPO || '8cee/BanjoRecomp-private-inputs' }}
       BANJO_ANDROID_KEYSTORE_BASE64: ${{ secrets.BANJO_ANDROID_KEYSTORE_BASE64 }}
       BANJO_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.BANJO_ANDROID_KEYSTORE_PASSWORD }}
       BANJO_ANDROID_KEY_ALIAS: ${{ secrets.BANJO_ANDROID_KEY_ALIAS }}
@@ -202,6 +202,9 @@ jobs:
 
           if [[ '${{ github.event_name }}' == 'pull_request' || ('${{ github.event_name }}' == 'push' && ('${{ github.ref_name }}' == ci/* || '${{ github.ref_name }}' == 'android')) ]]; then
             mode='probe'
+            build_type='Debug'
+          elif [[ '${{ github.event_name }}' == 'push' && '${{ github.ref_name }}' == 'runtime-ci' ]]; then
+            mode='runtime'
             build_type='Debug'
           elif [[ "$is_release_build" == true ]]; then
             mode='runtime'
@@ -282,6 +285,28 @@ jobs:
       - name: Build Android native dependencies
         shell: bash
         run: tools/ci/setup_android_deps.sh
+
+      - name: Validate private runtime inputs
+        if: steps.params.outputs.mode == 'runtime'
+        shell: bash
+        env:
+          PRIVATE_INPUTS_SSH_KEY: ${{ secrets.BANJO_ANDROID_PRIVATE_INPUTS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${PRIVATE_INPUTS_SSH_KEY}" ]]; then
+            cat >&2 <<EOF
+          Runtime APK generation requires a private repository containing:
+            banjo.us.v10.decompressed.z64
+
+          Expected repository:
+            ${BANJO_ANDROID_PRIVATE_INPUTS_REPO}
+
+          Configure repository variable BANJO_ANDROID_PRIVATE_INPUTS_REPO if using another repo,
+          and add repository secret BANJO_ANDROID_PRIVATE_INPUTS_SSH_KEY with read access to it.
+          The ROM is used only for source generation and is removed before APK packaging.
+          EOF
+            exit 2
+          fi
 
       - name: Checkout private runtime inputs
         if: steps.params.outputs.mode == 'runtime'
