@@ -38,7 +38,7 @@ public final class ModBrowserActivity extends Activity {
     private static final long MAX_CATALOG_BYTES = 2L * 1024L * 1024L;
     private static final long MAX_MOD_BYTES = 512L * 1024L * 1024L;
     private static final String CATALOG_CACHE_NAME = "mod-server-catalog.json";
-    private static final String INSTALLED_PREFS = "mod-server-installed";
+    private static final String DOWNLOADED_PREFS = "mod-server-downloaded";
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private LinearLayout modList;
@@ -194,12 +194,12 @@ public final class ModBrowserActivity extends Activity {
             card.addView(descView);
         }
 
-        String installedVersion = getSharedPreferences(INSTALLED_PREFS, MODE_PRIVATE)
+        String downloadedVersion = getSharedPreferences(DOWNLOADED_PREFS, MODE_PRIVATE)
                 .getString(id, null);
         Button install = new Button(this);
-        install.setText(installedVersion == null ? "Download & Install"
-                : installedVersion.equals(version) ? "Reinstall"
-                : "Update " + installedVersion + " → " + version);
+        install.setText(downloadedVersion == null ? "Download & Install"
+                : downloadedVersion.equals(version) ? "Download Again"
+                : "Download Update " + downloadedVersion + " → " + version);
         install.setOnClickListener(v -> {
             install.setEnabled(false);
             downloadMod(id, name, version, downloadUrl, sha256, install);
@@ -235,7 +235,7 @@ public final class ModBrowserActivity extends Activity {
 
                 Intent result = new Intent();
                 result.putExtra(EXTRA_MOD_PATH, destination.getAbsolutePath());
-                getSharedPreferences(INSTALLED_PREFS, MODE_PRIVATE)
+                getSharedPreferences(DOWNLOADED_PREFS, MODE_PRIVATE)
                         .edit().putString(id, version).apply();
                 setResult(Activity.RESULT_OK, result);
                 runOnUiThread(() -> {
