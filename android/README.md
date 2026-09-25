@@ -184,3 +184,12 @@ Generated files should stay untracked:
 - `android/app/.cxx/`
 
 If lifecycle, audio, or Vulkan behavior regresses, check `docs/plans/android-port-review-findings.md` and the native-platform-porting skill references before making broad changes.
+
+
+## 8CEE Mod Server
+
+The Android Mods page keeps the normal **Install Mods** action for local ZIP/NRM/RTZ files and adds **Browse Mods** for the 8CEE catalog.
+
+The catalog is hosted at `mod-server/index.json` in this repository. Downloads use HTTPS, are staged in app-private cache, optionally verify SHA-256 from the catalog, and are then passed into BanjoRecomp's existing mod installer so normal manifest, package, overwrite, dependency, and deprecation checks remain authoritative.
+
+The Android package ID is `com.eightcee.bk64recomp`.
