@@ -30,6 +30,7 @@ public final class DiagnosticsLogger {
         final FileOutputStream stream;
         final BufferedWriter writer;
         Process logcat;
+        Thread.UncaughtExceptionHandler previousHandler;
         long bytes;
 
         Session(File file, FileOutputStream stream, BufferedWriter writer) {
@@ -52,6 +53,25 @@ public final class DiagnosticsLogger {
                 BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(stream, StandardCharsets.UTF_8), 16384);
                 Session s = new Session(file, stream, writer);
                 session = s;
+                s.previousHandler = Thread.getDefaultUncaughtExceptionHandler();
+                Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
+                    synchronized (LOCK) {
+                        try {
+                            if (session == s) {
+                                write(s, "\n!!! JAVA CRASH !!!\n");
+                                write(s, "Thread: " + thread.getName() + "\n");
+                                write(s, throwable.toString() + "\n");
+                                for (StackTraceElement frame : throwable.getStackTrace()) {
+                                    write(s, "  at " + frame + "\n");
+                                }
+                            }
+                        } catch (Throwable ignored) {}
+                    }
+                    Thread.UncaughtExceptionHandler previous = s.previousHandler;
+                    if (previous != null) {
+                        previous.uncaughtException(thread, throwable);
+                    }
+                });
                 write(s, "BanjoRecomp Android diagnostic log\n");
                 write(s, "Package: " + context.getPackageName() + "\n");
                 write(s, "Device: " + Build.MANUFACTURER + " " + Build.MODEL
@@ -146,6 +166,9 @@ public final class DiagnosticsLogger {
         session = null;
         if (s == null) return;
         try { if (s.logcat != null) s.logcat.destroy(); } catch (Throwable ignored) {}
+        try {
+            if (s.previousHandler != null) Thread.setDefaultUncaughtExceptionHandler(s.previousHandler);
+        } catch (Throwable ignored) {}
         try { s.writer.flush(); } catch (Throwable ignored) {}
         try { s.stream.getFD().sync(); } catch (Throwable ignored) {}
         try { s.writer.close(); } catch (Throwable ignored) {}
