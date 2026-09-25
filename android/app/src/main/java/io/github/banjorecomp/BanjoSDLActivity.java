@@ -506,15 +506,17 @@ public class BanjoSDLActivity extends SDLActivity {
                 throw new IOException("Backup has invalid size: " + backupSave.length()
                         + " bytes (expected " + BANJO_SAVE_SIZE + ")");
             }
+            boolean safetyBackupCreated = false;
             if (activeSave.isFile()) {
                 copyFile(activeSave, safetySave);
+                safetyBackupCreated = true;
             }
             boolean ok = nativeImportSave(backupSave.getAbsolutePath());
             if (!ok) {
                 nativeOnSaveOperation("Backup restore failed", null);
                 return;
             }
-            nativeOnSaveOperation(activeSave.isFile()
+            nativeOnSaveOperation(safetyBackupCreated
                     ? "Backup restored successfully; previous active save preserved as " + safetySave.getName()
                     : "Backup restored successfully", null);
             synchronizeSaveFolder();
