@@ -157,6 +157,7 @@ jobs:
       BANJO_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.BANJO_ANDROID_KEYSTORE_PASSWORD }}
       BANJO_ANDROID_KEY_ALIAS: ${{ secrets.BANJO_ANDROID_KEY_ALIAS }}
       BANJO_ANDROID_KEY_PASSWORD: ${{ secrets.BANJO_ANDROID_KEY_PASSWORD }}
+      BANJO_ANDROID_PRIVATE_INPUTS_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
 
     steps:
       - name: Checkout
@@ -293,23 +294,29 @@ jobs:
           PRIVATE_INPUTS_SSH_KEY: ${{ secrets.BANJO_ANDROID_PRIVATE_INPUTS_SSH_KEY }}
         run: |
           set -euo pipefail
-          if [[ -z "${PRIVATE_INPUTS_SSH_KEY}" ]]; then
-            cat >&2 <<EOF
-          Runtime APK generation requires a private repository containing:
-            banjo.us.v10.decompressed.z64
-
-          Expected repository:
-            ${BANJO_ANDROID_PRIVATE_INPUTS_REPO}
-
-          Configure repository variable BANJO_ANDROID_PRIVATE_INPUTS_REPO if using another repo,
-          and add repository secret BANJO_ANDROID_PRIVATE_INPUTS_SSH_KEY with read access to it.
-          The ROM is used only for source generation and is removed before APK packaging.
-          EOF
+          if [[ -z "${BANJO_ANDROID_PRIVATE_INPUTS_TOKEN:-}" && -z "${PRIVATE_INPUTS_SSH_KEY:-}" ]]; then
+            echo 'Runtime APK generation requires a private repository containing:' >&2
+            echo '  banjo.us.v10.decompressed.z64' >&2
+            echo >&2
+            echo "Expected repository: ${BANJO_ANDROID_PRIVATE_INPUTS_REPO}" >&2
+            echo >&2
+            echo 'Add either repository secret PRIVATE_REPO_TOKEN (recommended; same pattern as DK64)' >&2
+            echo 'or BANJO_ANDROID_PRIVATE_INPUTS_SSH_KEY with read access to that repository.' >&2
+            echo 'The ROM is used only for source generation and is removed before APK packaging.' >&2
             exit 2
           fi
 
-      - name: Checkout private runtime inputs
-        if: steps.params.outputs.mode == 'runtime'
+      - name: Checkout private runtime inputs with token
+        if: steps.params.outputs.mode == 'runtime' && env.BANJO_ANDROID_PRIVATE_INPUTS_TOKEN != ''
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.BANJO_ANDROID_PRIVATE_INPUTS_REPO }}
+          token: ${{ env.BANJO_ANDROID_PRIVATE_INPUTS_TOKEN }}
+          path: extra
+          persist-credentials: false
+
+      - name: Checkout private runtime inputs with SSH
+        if: steps.params.outputs.mode == 'runtime' && env.BANJO_ANDROID_PRIVATE_INPUTS_TOKEN == ''
         uses: actions/checkout@v4
         with:
           repository: ${{ env.BANJO_ANDROID_PRIVATE_INPUTS_REPO }}
