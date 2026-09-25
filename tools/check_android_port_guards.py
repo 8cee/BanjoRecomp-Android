@@ -152,6 +152,9 @@ def main() -> int:
     require("nativeGetInstalledModVersion" in main_cpp and "nativeGetInstalledModVersion" in save_activity
             and "BanjoSDLActivity.nativeGetInstalledModVersion" in mod_browser,
             "mod browser must query native installed mod versions before labeling updates")
+    require("nativeCompareVersions" in main_cpp and "Version::from_string" in main_cpp
+            and "nativeCompareVersions" in save_activity,
+            "mod browser must compare installed/catalog versions with runtime semantic version parsing")
     require("nativeIsModEnabled" in main_cpp and "nativeSetModEnabled" in main_cpp
             and "nativeUninstallMod" in main_cpp and "nativeIsModAutoEnabled" in main_cpp,
             "native mod bridge must retain enable, dependency, and uninstall operations")
@@ -173,8 +176,9 @@ def main() -> int:
             "mod catalog must retain game/app compatibility gating")
     require('"Search mods"' in mod_browser and "currentCatalog" in mod_browser
             and "Update available" in mod_browser and '"Updates only"' in mod_browser
-            and "hasCatalogUpdate" in mod_browser,
-            "mod browser must retain search/filter, updates-only filtering, and installed update status")
+            and "hasCatalogUpdate" in mod_browser and "nativeCompareVersions" in mod_browser
+            and '"Installed version is newer"' in mod_browser,
+            "mod browser must retain semantic update filtering and installed version status")
     require('"Homepage"' in mod_browser and "updateTypeFilterOptions" in mod_browser
             and 'Collections.sort(types, String.CASE_INSENSITIVE_ORDER)' in mod_browser
             and 'typeAdapter.add("All")' in mod_browser
