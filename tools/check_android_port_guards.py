@@ -144,6 +144,9 @@ def main() -> int:
     require("nativeGetInstalledModVersion" in main_cpp and "nativeGetInstalledModVersion" in save_activity
             and "BanjoSDLActivity.nativeGetInstalledModVersion" in mod_browser,
             "mod browser must query native installed mod versions before labeling updates")
+    require("SUPPORTED_GAME_ID" in mod_browser and "min_app_version_code" in mod_browser
+            and '"Not Compatible"' in mod_browser,
+            "mod catalog must retain game/app compatibility gating")
     require("protected void onResume()" in mod_browser and "refreshCatalog();" in mod_browser,
             "mod browser must refresh browser labels from native state after returning")
     require('"schema": 1' in mod_catalog and '"mods": [' in mod_catalog,
