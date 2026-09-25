@@ -147,9 +147,14 @@ def main() -> int:
     require("nativeIsModEnabled" in main_cpp and "nativeSetModEnabled" in main_cpp
             and "nativeUninstallMod" in main_cpp and "nativeIsModAutoEnabled" in main_cpp,
             "native mod bridge must retain enable, dependency, and uninstall operations")
+    require("nativeGetModUninstallBlockReason" in main_cpp
+            and "Required by installed mod:" in main_cpp,
+            "native uninstall must block removal of installed dependencies")
     require('"Uninstall"' in mod_browser and '"Required by Dependency"' in mod_browser
             and "nativeSetModEnabled" in mod_browser,
             "mod browser must expose safe installed-mod controls")
+    require("AlertDialog.Builder" in mod_browser and '"Uninstall Blocked"' in mod_browser,
+            "mod browser uninstall must require confirmation and show dependency blocks")
     require("SUPPORTED_GAME_ID" in mod_browser and "min_app_version_code" in mod_browser
             and '"Not Compatible"' in mod_browser,
             "mod catalog must retain game/app compatibility gating")
