@@ -177,7 +177,7 @@ def main() -> int:
     require('"Search mods"' in mod_browser and "currentCatalog" in mod_browser
             and "Update available" in mod_browser and '"Updates only"' in mod_browser
             and "hasCatalogUpdate" in mod_browser and "nativeCompareVersions" in mod_browser
-            and '"Installed version is newer"' in mod_browser,
+            and "Installed version is newer" in mod_browser,
             "mod browser must retain semantic update filtering and installed version status")
     require('"Homepage"' in mod_browser and "updateTypeFilterOptions" in mod_browser
             and 'Collections.sort(types, String.CASE_INSENSITIVE_ORDER)' in mod_browser
