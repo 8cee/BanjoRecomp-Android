@@ -4,6 +4,10 @@
 #include "recompinput/recompinput.h"
 #include "banjo_sound.h"
 #include "banjo_support.h"
+#if defined(__ANDROID__)
+#include <jni.h>
+#include <SDL2/SDL_system.h>
+#endif
 #include "ultramodern/config.hpp"
 #include "librecomp/files.hpp"
 #include "librecomp/config.hpp"
@@ -242,6 +246,22 @@ banjo::CutsceneAspectRatioMode banjo::get_cutscene_aspect_ratio_mode() {
     return get_graphics_config_enum_value<banjo::CutsceneAspectRatioMode>(banjo::configkeys::graphics::cutscene_aspect_ratio_mode);
 }
 
+#if defined(__ANDROID__)
+namespace {
+void open_android_diagnostics() {
+    auto* env = static_cast<JNIEnv*>(SDL_AndroidGetJNIEnv());
+    jobject activity = static_cast<jobject>(SDL_AndroidGetActivity());
+    if (!env || !activity) return;
+    jclass cls = env->GetObjectClass(activity);
+    jmethodID method = cls ? env->GetMethodID(cls, "openDiagnostics", "()V") : nullptr;
+    if (method) env->CallVoidMethod(activity, method);
+    if (env->ExceptionCheck()) env->ExceptionClear();
+    if (cls) env->DeleteLocalRef(cls);
+    env->DeleteLocalRef(activity);
+}
+}
+#endif
+
 void banjo::init_config() {
     std::filesystem::path recomp_dir = recompui::file::get_app_folder_path();
 
@@ -256,6 +276,14 @@ void banjo::init_config() {
 
     auto &general_config = recompui::config::create_general_tab(general_options);
     add_general_options(general_config);
+#if defined(__ANDROID__)
+    general_config.add_action_option(
+        "android_diagnostics",
+        "Logs & Diagnostics",
+        "Open the Android diagnostic log viewer and share recent session logs.",
+        "Open...",
+        [] { open_android_diagnostics(); });
+#endif
 
     auto &graphics_config = recompui::config::create_graphics_tab();
     add_graphics_options(graphics_config);
