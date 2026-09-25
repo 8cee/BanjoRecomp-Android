@@ -589,8 +589,19 @@ public class BanjoSDLActivity extends SDLActivity {
         try {
             if (requestCode == REQUEST_IMPORT_SAVE) {
                 copyUriToFile(uri, temporary);
+                File activeSave = new File(new File(getFilesDir(), "data/saves"), RUNTIME_SAVE_NAME);
+                File backupSave = new File(activeSave.getParentFile(), RUNTIME_SAVE_NAME + ".bak");
+                if (temporary.length() != BANJO_SAVE_SIZE) {
+                    throw new IOException("Invalid Banjo save size: " + temporary.length()
+                            + " bytes (expected " + BANJO_SAVE_SIZE + ")");
+                }
+                if (activeSave.isFile()) {
+                    copyFile(activeSave, backupSave);
+                }
                 boolean ok = nativeImportSave(temporary.getAbsolutePath());
-                nativeOnSaveOperation(ok ? "Save imported successfully" : "Import rejected: wrong size or write failed", null);
+                nativeOnSaveOperation(ok
+                        ? "Save imported successfully; previous save backed up as " + backupSave.getName()
+                        : "Import rejected: wrong size or write failed", null);
                 if (ok) synchronizeSaveFolder();
             } else {
                 if (!nativePrepareSaveExport(temporary.getAbsolutePath())) throw new IOException("Could not snapshot active save");
@@ -719,6 +730,17 @@ public class BanjoSDLActivity extends SDLActivity {
     private void copyUriToFile(Uri uri, File file) throws IOException {
         try (InputStream in = getContentResolver().openInputStream(uri); OutputStream out = new FileOutputStream(file)) {
             if (in == null) throw new IOException("Provider returned no input stream");
+            copyStream(in, out);
+        }
+    }
+
+    private void copyFile(File source, File destination) throws IOException {
+        File parent = destination.getParentFile();
+        if (parent != null && !parent.isDirectory() && !parent.mkdirs() && !parent.isDirectory()) {
+            throw new IOException("Could not create backup directory");
+        }
+        try (InputStream in = new FileInputStream(source);
+             OutputStream out = new FileOutputStream(destination, false)) {
             copyStream(in, out);
         }
     }
