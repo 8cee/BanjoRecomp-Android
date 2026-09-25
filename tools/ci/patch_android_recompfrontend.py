@@ -70,7 +70,7 @@ cpp = replace_once(
     """void ModMenu::open_mod_server() {
 #if defined(__ANDROID__)
     if (!launch_android_mod_server()) {
-        recompui::file::show_error_message_box("Browse Mods", "Unable to open the 8CEE mod server.");
+        recompui::file::show_error_message_box("Browse Mods", "Unable to open the Banjo-Recompiled Thunderstore browser.");
     }
 #endif
 }
