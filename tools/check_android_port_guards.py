@@ -105,6 +105,9 @@ def main() -> int:
     require("BANJO_ANDROID_BASEROM" in android_gradle and "BANJO_ANDROID_DECOMPRESSED_ROM" in android_gradle and "banjoDevRomDir" in android_gradle, "Gradle dev-ROM inputs must be overrideable without copying private files into the repo")
     require("buildConfigField 'boolean', 'BANJO_BUNDLE_DEV_ROMS', banjoBundleDevRoms.toString()" in android_gradle, "Gradle must expose the dev-ROM packaging flag to Android Java")
     require("BuildConfig.BANJO_BUNDLE_DEV_ROMS && bundledDevRom.isFile()" in read("android/app/src/main/java/io/github/banjorecomp/BanjoSDLActivity.java"), "Android Java RECOMP_AUTO_ROM_PATH setup must be gated behind BANJO_BUNDLE_DEV_ROMS")
+    require("public void setOrientationBis(int w, int h, boolean resizable, String hint)" in save_activity
+            and "SCREEN_ORIENTATION_SENSOR_LANDSCAPE" in save_activity,
+            "SDL orientation override must keep Banjo in sensor landscape")
     android_manifest = read("android/app/src/main/AndroidManifest.xml")
     mod_browser = read("android/app/src/main/java/io/github/banjorecomp/ModBrowserActivity.java")
     mod_catalog = read("mod-server/index.json")
