@@ -130,6 +130,14 @@ def main() -> int:
     require("deleteArchivedLogs" in diagnostics_logger and "file.equals(current)" in diagnostics_logger
             and '"Clear archived logs"' in diagnostics_activity and "AlertDialog.Builder" in diagnostics_activity,
             "diagnostics must retain confirmed archived-log cleanup without deleting the current session")
+    require("AUTOMATIC SESSION SUMMARY" in diagnostics_logger and "Captured lines:" in diagnostics_logger
+            and "Most frequent errors/fatal lines:" in diagnostics_logger
+            and "FLUSH_EVERY_N" in diagnostics_logger,
+            "diagnostics must retain DK64-style session summaries and frequent error/warning tracking")
+    require("setEnabled" in diagnostics_logger and "isEnabled" in diagnostics_logger
+            and '"Turn diagnostic capture OFF"' in diagnostics_activity
+            and '"Capture ON — current session:"' in diagnostics_activity,
+            "diagnostics screen must retain live capture toggle and current-session status")
     require("openDiagnostics()" in save_activity and '"android_diagnostics"' in game_config
             and '"Logs & Diagnostics"' in game_config,
             "Banjo settings must retain the in-app diagnostics action")
