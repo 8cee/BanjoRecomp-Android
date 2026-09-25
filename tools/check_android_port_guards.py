@@ -152,7 +152,7 @@ def main() -> int:
             and "parseCatalog" in mod_browser,
             "mod browser must retain validated offline catalog fallback")
     require("DOWNLOADED_PREFS" in mod_browser and "resolvePackageFileName" in mod_browser
-            and '"Download Again"' in mod_browser and '"Download Update "' in mod_browser,
+            and '"Download again"' in mod_browser and '"Download update"' in mod_browser,
             "mod browser must preserve package type and track last downloaded catalog versions truthfully")
     require("supportedPackageExtension" in mod_browser and "package_type" in mod_browser
             and "file_name" in mod_browser and "resolvePackageExtension" in mod_browser
@@ -175,13 +175,14 @@ def main() -> int:
     require("Failed to uninstall mod" in main_cpp
             and "recomp::mods::scan_mods();\n        return JNI_FALSE;" in main_cpp,
             "failed uninstall must rescan mods to restore the registry")
-    require('"Uninstall"' in mod_browser and '"Required by Dependency"' in mod_browser
-            and "nativeSetModEnabled" in mod_browser,
+    require('"Uninstall"' in mod_browser and '"Required"' in mod_browser
+            and "nativeSetModEnabled" in mod_browser and "nativeIsModAutoEnabled" in mod_browser,
             "mod browser must expose safe installed-mod controls")
-    require("AlertDialog.Builder" in mod_browser and '"Uninstall Blocked"' in mod_browser,
-            "mod browser uninstall must require confirmation and show dependency blocks")
+    require("AlertDialog.Builder" in mod_browser and '"Uninstall blocked"' in mod_browser
+            and "nativeGetModUninstallBlockReason" in mod_browser,
+            "mod browser uninstall must require confirmation and dependency-safe blocking")
     require("SUPPORTED_GAME_ID" in mod_browser and "min_app_version_code" in mod_browser
-            and '"Not Compatible"' in mod_browser,
+            and '"Not compatible"' in mod_browser,
             "mod catalog must retain game/app compatibility gating")
     require('"Search mods"' in mod_browser and "currentCatalog" in mod_browser
             and "Update available" in mod_browser and '"Updates only"' in mod_browser
