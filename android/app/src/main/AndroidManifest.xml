@@ -1,17 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.hardware.gamepad" android:required="false" />
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+    <uses-feature android:name="android.hardware.usb.host" android:required="false" />
+    <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:allowBackup="false"
         android:hasCode="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
-        android:label="Banjo Recompiled">
+        android:label="Banjo Recompiled"
+        android:appCategory="game"
+        android:isGame="true">
         <activity
             android:name="io.github.banjorecomp.ModBrowserActivity"
             android:exported="false"
             android:label="8CEE Mod Server"
-            android:screenOrientation="landscape"
+            android:screenOrientation="sensorLandscape"
             android:theme="@style/BanjoTheme" />
         <activity
             android:name="io.github.banjorecomp.BanjoSDLActivity"
@@ -20,7 +27,7 @@
             android:hardwareAccelerated="true"
             android:label="Banjo Recompiled"
             android:launchMode="singleTask"
-            android:screenOrientation="landscape"
+            android:screenOrientation="sensorLandscape"
             android:theme="@style/BanjoTheme">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
