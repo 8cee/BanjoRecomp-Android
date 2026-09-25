@@ -219,9 +219,11 @@ The Android app exposes save import/export through **Settings → Save Managemen
 
 The regular `android` branch runs the lightweight probe build. A full Banjo runtime APK build is available through the `runtime-ci` branch or `workflow_dispatch` with `build_mode=runtime`.
 
-The runtime generator needs one private input file at build time:
+The runtime generator needs your normal Banjo-Kazooie US v1.0 ROM at build time:
 
-- `banjo.us.v10.decompressed.z64`
+- `baserom.us.v10.z64`
+
+CI verifies the expected US v1.0 SHA-1, generates the decompressed runtime image automatically through the Banjo decomp project, and then continues with N64Recomp.
 
 By default CI expects a private repository named `8cee/BanjoRecomp-private-inputs`. Add the file at that repository root and add a repository secret named `PRIVATE_REPO_TOKEN` to this repository with read access to the private inputs repo. The workflow also supports `BANJO_ANDROID_PRIVATE_INPUTS_SSH_KEY` as a fallback.
 
