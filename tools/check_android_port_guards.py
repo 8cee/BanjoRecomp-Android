@@ -124,6 +124,9 @@ def main() -> int:
             "diagnostics launcher shortcut and share provider must remain registered")
     require("DiagnosticsLogger.start(this)" in save_activity and 'DiagnosticsLogger.stop("onDestroy")' in save_activity,
             "diagnostics capture must remain tied to the Banjo activity lifecycle")
+    diagnostics_logger = read("android/app/src/main/java/io/github/banjorecomp/DiagnosticsLogger.java")
+    require("setDefaultUncaughtExceptionHandler" in diagnostics_logger and "JAVA CRASH" in diagnostics_logger,
+            "diagnostics must retain Java crash capture")
     require("openDiagnostics()" in save_activity and '"android_diagnostics"' in game_config
             and '"Logs & Diagnostics"' in game_config,
             "Banjo settings must retain the in-app diagnostics action")
