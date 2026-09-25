@@ -210,6 +210,9 @@ def main() -> int:
             "save document/provider I/O must remain off the UI thread and serialized")
     require('RUNTIME_SAVE_NAME + ".bak"' in save_activity and "copyFile(activeSave, backupSave)" in save_activity,
             "save import must preserve a DK64-style .bak of the previous Banjo save")
+    require("restoreSaveBackup" in save_activity and "safetyBackupCreated" in save_activity
+            and 'RUNTIME_SAVE_NAME + ".pre-restore.bak"' in save_activity,
+            "save restore must preserve and accurately report the pre-restore safety backup")
     require("ultramodern::snapshot_save_file(snapshot)" in save_bridge and "ultramodern::import_save_file(data)" in save_bridge,
             "Android save JNI must use transactional runtime snapshot/import APIs")
     require("control_requested_generation" in save_runtime and "control_acknowledged_generation" in save_runtime
