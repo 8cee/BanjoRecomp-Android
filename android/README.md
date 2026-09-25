@@ -111,7 +111,7 @@ gradle -p android :app:assembleDebug -PbanjoProbe=true
 
 ```sh
 adb install -r android/app/build/outputs/apk/debug/app-debug.apk
-adb shell am start -n com.aure.banjorecomp/io.github.banjorecomp.BanjoSDLActivity
+adb shell am start -n com.eightcee.bk64recomp/io.github.banjorecomp.BanjoSDLActivity
 ```
 
 ## Custom Vulkan driver safe mode
@@ -129,7 +129,7 @@ User flow:
 If a bad active custom driver prevents normal startup, launch once with the system-driver bypass:
 
 ```sh
-adb shell am start -n com.aure.banjorecomp/io.github.banjorecomp.BanjoSDLActivity --ez banjo_force_system_driver true
+adb shell am start -n com.eightcee.bk64recomp/io.github.banjorecomp.BanjoSDLActivity --ez banjo_force_system_driver true
 ```
 
 That sets `BANJO_FORCE_SYSTEM_DRIVER=1` before native Vulkan initialization. The native loader ignores `files/gpu-drivers/active.json`, uses Android's system Vulkan driver, and keeps the fallback reason visible in the Graphics driver details/logcat. Use the Graphics settings `Reset to System Driver` action to clear the active selection; it preserves imported driver files but removes the active selection and marks restart required.
@@ -160,7 +160,7 @@ When a selected folder contains no recognized Banjo save artifacts, the current 
 Back up before device testing:
 
 ```sh
-adb exec-out "run-as com.aure.banjorecomp cat files/data/saves/bk.n64.us.1.0.bin" > backup.bin
+adb exec-out "run-as com.eightcee.bk64recomp cat files/data/saves/bk.n64.us.1.0.bin" > backup.bin
 ```
 
 Offline verification:
