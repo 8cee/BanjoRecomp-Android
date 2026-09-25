@@ -118,6 +118,11 @@ def main() -> int:
             "Android manifest must retain mod-server networking and rumble permissions")
     require('android:appCategory="game"' in android_manifest and 'android:isGame="true"' in android_manifest,
             "Android manifest must identify Banjo as a game")
+    require("DiagnosticsActivity" in android_manifest and "DiagnosticsFilesProvider" in android_manifest
+            and "android.app.shortcuts" in android_manifest,
+            "diagnostics launcher shortcut and share provider must remain registered")
+    require("DiagnosticsLogger.start(this)" in save_activity and 'DiagnosticsLogger.stop("onDestroy")' in save_activity,
+            "diagnostics capture must remain tied to the Banjo activity lifecycle")
     require("ModBrowserActivity" in android_manifest and "REQUEST_MOD_SERVER" in save_activity
             and "openModServerBrowser()" in save_activity,
             "8CEE mod browser must remain wired into BanjoSDLActivity")
