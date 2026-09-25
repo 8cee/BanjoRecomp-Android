@@ -237,6 +237,60 @@ Java_io_github_banjorecomp_BanjoSDLActivity_nativeGetInstalledModVersion(
     return nullptr;
 }
 
+extern "C" JNIEXPORT jboolean JNICALL
+Java_io_github_banjorecomp_BanjoSDLActivity_nativeIsModEnabled(
+    JNIEnv* env, jclass, jstring mod_id_string) {
+    const std::string mod_id = android_jstring_to_string(env, mod_id_string);
+    if (mod_id.empty()) return JNI_FALSE;
+    return (recomp::mods::is_mod_enabled(mod_id) || recomp::mods::is_mod_auto_enabled(mod_id))
+        ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_io_github_banjorecomp_BanjoSDLActivity_nativeIsModAutoEnabled(
+    JNIEnv* env, jclass, jstring mod_id_string) {
+    const std::string mod_id = android_jstring_to_string(env, mod_id_string);
+    if (mod_id.empty()) return JNI_FALSE;
+    return recomp::mods::is_mod_auto_enabled(mod_id) ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_io_github_banjorecomp_BanjoSDLActivity_nativeSetModEnabled(
+    JNIEnv* env, jclass, jstring mod_id_string, jboolean enabled) {
+    const std::string mod_id = android_jstring_to_string(env, mod_id_string);
+    if (mod_id.empty()) return JNI_FALSE;
+    recomp::mods::enable_mod(mod_id, enabled == JNI_TRUE);
+    const bool actual = recomp::mods::is_mod_enabled(mod_id) || recomp::mods::is_mod_auto_enabled(mod_id);
+    return actual ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_io_github_banjorecomp_BanjoSDLActivity_nativeUninstallMod(
+    JNIEnv* env, jclass, jstring mod_id_string) {
+    if (ultramodern::is_game_started()) return JNI_FALSE;
+    const std::string mod_id = android_jstring_to_string(env, mod_id_string);
+    if (mod_id.empty()) return JNI_FALSE;
+
+    const std::filesystem::path path = recomp::mods::get_mod_filename(mod_id);
+    if (path.empty()) return JNI_FALSE;
+
+    std::error_code ec;
+    if (std::filesystem::is_directory(path, ec)) {
+        std::filesystem::remove_all(path, ec);
+    } else {
+        std::filesystem::remove(path, ec);
+    }
+    if (ec) {
+        __android_log_print(ANDROID_LOG_ERROR, "BanjoModServer",
+            "Failed to uninstall mod %s from %s: %s",
+            mod_id.c_str(), path.string().c_str(), ec.message().c_str());
+        return JNI_FALSE;
+    }
+
+    recomp::mods::scan_mods();
+    return recomp::mods::get_mod_filename(mod_id).empty() ? JNI_TRUE : JNI_FALSE;
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_io_github_banjorecomp_BanjoSDLActivity_nativeOnRomSelected(JNIEnv* env, jclass, jstring path_string) {
     if (path_string == nullptr) {
