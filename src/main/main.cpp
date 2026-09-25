@@ -321,6 +321,7 @@ Java_io_github_banjorecomp_BanjoSDLActivity_nativeUninstallMod(
         __android_log_print(ANDROID_LOG_ERROR, "BanjoModServer",
             "Failed to uninstall mod %s from %s: %s",
             mod_id.c_str(), path.string().c_str(), ec.message().c_str());
+        recomp::mods::scan_mods();
         return JNI_FALSE;
     }
 
