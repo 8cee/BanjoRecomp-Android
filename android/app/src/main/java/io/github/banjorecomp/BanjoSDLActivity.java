@@ -1151,6 +1151,7 @@ public class BanjoSDLActivity extends SDLActivity {
     }
 
     private static native void nativeOnModsSelected(String[] paths);
+    public static native String nativeGetInstalledModVersion(String modId);
     private static native void nativeOnRomSelected(String path);
     private static native void nativeOnGpuDriverImported(
             String driverId,
