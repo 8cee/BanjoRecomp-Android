@@ -13,6 +13,7 @@ import android.provider.DocumentsContract;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
@@ -84,6 +85,7 @@ public class BanjoSDLActivity extends SDLActivity {
     private boolean windowFocused;
     private boolean appAudioActive;
     private DualScreenStatsManager dualScreenStatsManager;
+    private VirtualPadView virtualPadView;
     private final ExecutorService saveIoExecutor = Executors.newSingleThreadExecutor();
     private String startupSaveStatus;
     private String startupSaveLocation;
@@ -116,6 +118,19 @@ public class BanjoSDLActivity extends SDLActivity {
 
         super.onCreate(savedInstanceState);
         applyImmersiveFullscreen();
+
+        if (mLayout != null && virtualPadView == null) {
+            try {
+                virtualPadView = new VirtualPadView(this);
+                mLayout.addView(virtualPadView, new ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT));
+                Log.i(TAG, "Mobile virtual gamepad overlay attached");
+            } catch (UnsatisfiedLinkError error) {
+                Log.e(TAG, "Virtual gamepad JNI unavailable", error);
+                virtualPadView = null;
+            }
+        }
         dualScreenStatsManager = new DualScreenStatsManager(this);
         dualScreenStatsManager.start();
 
