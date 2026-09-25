@@ -217,6 +217,26 @@ Java_io_github_banjorecomp_BanjoSDLActivity_nativeOnModsSelected(JNIEnv* env, jc
     push_android_mod_drop_events(env, paths);
 }
 
+extern "C" JNIEXPORT jstring JNICALL
+Java_io_github_banjorecomp_BanjoSDLActivity_nativeGetInstalledModVersion(
+    JNIEnv* env, jclass, jstring mod_id_string) {
+    if (mod_id_string == nullptr) {
+        return nullptr;
+    }
+    const std::string mod_id = android_jstring_to_string(env, mod_id_string);
+    if (mod_id.empty()) {
+        return nullptr;
+    }
+    const auto mods = recomp::mods::get_all_mod_details("bk");
+    for (const auto& mod : mods) {
+        if (mod.mod_id == mod_id) {
+            const std::string version = mod.version.to_string();
+            return env->NewStringUTF(version.c_str());
+        }
+    }
+    return nullptr;
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_io_github_banjorecomp_BanjoSDLActivity_nativeOnRomSelected(JNIEnv* env, jclass, jstring path_string) {
     if (path_string == nullptr) {
