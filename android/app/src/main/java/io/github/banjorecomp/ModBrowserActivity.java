@@ -7,10 +7,13 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.content.res.ColorStateList;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Gravity;
+import android.view.WindowInsets;
 import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
@@ -23,6 +26,7 @@ import android.widget.Spinner;
 import android.widget.ArrayAdapter;
 import android.widget.AdapterView;
 import android.widget.TextView;
+import android.text.TextUtils;
 import android.text.Editable;
 import android.text.TextWatcher;
 
@@ -58,6 +62,7 @@ public final class ModBrowserActivity extends Activity {
     private static final String SUPPORTED_GAME_ID = "bk";
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final ExecutorService thumbnailExecutor = Executors.newFixedThreadPool(3);
     private LinearLayout modList;
     private TextView status;
     private ProgressBar progress;
@@ -86,28 +91,62 @@ public final class ModBrowserActivity extends Activity {
     @Override
     protected void onDestroy() {
         executor.shutdownNow();
+        thumbnailExecutor.shutdownNow();
         super.onDestroy();
     }
 
     private void buildUi() {
+        final int baseHorizontal = dp(16);
+        final int baseTop = dp(12);
+        final int baseBottom = dp(12);
+
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(20), dp(16), dp(20), dp(16));
-        root.setBackgroundColor(Color.rgb(20, 24, 31));
+        root.setPadding(baseHorizontal, baseTop, baseHorizontal, baseBottom);
+        root.setBackgroundColor(Color.rgb(13, 17, 23));
+        root.setFitsSystemWindows(true);
+        root.setOnApplyWindowInsetsListener((view, insets) -> {
+            int left = insets.getSystemWindowInsetLeft();
+            int top = insets.getSystemWindowInsetTop();
+            int right = insets.getSystemWindowInsetRight();
+            int bottom = insets.getSystemWindowInsetBottom();
+            view.setPadding(baseHorizontal + left, baseTop + top,
+                    baseHorizontal + right, baseBottom + bottom);
+            return insets;
+        });
 
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(0, 0, 0, dp(10));
+
+        LinearLayout heading = new LinearLayout(this);
+        heading.setOrientation(LinearLayout.VERTICAL);
 
         TextView title = new TextView(this);
         title.setText("Thunderstore Mods");
         title.setTextColor(Color.WHITE);
-        title.setTextSize(24f);
+        title.setTextSize(22f);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
-        header.addView(title, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        heading.addView(title);
+
+        TextView subtitle = new TextView(this);
+        subtitle.setText("Banjo-Recompiled community");
+        subtitle.setTextColor(Color.rgb(139, 148, 158));
+        subtitle.setTextSize(12f);
+        heading.addView(subtitle);
+
+        header.addView(heading, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
         Button refresh = new Button(this);
         refresh.setText("Refresh");
+        refresh.setAllCaps(false);
+        refresh.setMinWidth(0);
+        refresh.setMinimumWidth(0);
+        refresh.setMinHeight(dp(40));
+        refresh.setPadding(dp(14), 0, dp(14), 0);
+        styleButton(refresh, false);
         refresh.setOnClickListener(v -> refreshCatalog());
         header.addView(refresh);
 
@@ -117,7 +156,10 @@ public final class ModBrowserActivity extends Activity {
         search.setHint("Search mods");
         search.setSingleLine(true);
         search.setTextColor(Color.WHITE);
-        search.setHintTextColor(Color.GRAY);
+        search.setHintTextColor(Color.rgb(139, 148, 158));
+        search.setTextSize(16f);
+        search.setPadding(dp(14), 0, dp(14), 0);
+        search.setBackground(rounded(Color.rgb(22, 27, 34), Color.rgb(48, 54, 61), 1, 10));
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
@@ -125,48 +167,84 @@ public final class ModBrowserActivity extends Activity {
             }
             @Override public void afterTextChanged(Editable s) {}
         });
-        root.addView(search, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
+        LinearLayout.LayoutParams searchParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(48));
+        searchParams.setMargins(0, 0, 0, dp(8));
+        root.addView(search, searchParams);
+
+        LinearLayout filters = new LinearLayout(this);
+        filters.setOrientation(LinearLayout.HORIZONTAL);
+        filters.setGravity(Gravity.CENTER_VERTICAL);
 
         typeFilter = new Spinner(this);
-        typeAdapter = new ArrayAdapter<>(
-                this, android.R.layout.simple_spinner_item, new ArrayList<>(Collections.singletonList("All")));
+        typeAdapter = new ArrayAdapter<String>(
+                this, android.R.layout.simple_spinner_item,
+                new ArrayList<>(Collections.singletonList("All"))) {
+            @Override
+            public View getView(int position, View convertView, android.view.ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                if (view instanceof TextView) {
+                    TextView text = (TextView) view;
+                    text.setTextColor(Color.WHITE);
+                    text.setTextSize(14f);
+                    text.setPadding(dp(12), 0, dp(12), 0);
+                }
+                return view;
+            }
+        };
         typeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         typeFilter.setAdapter(typeAdapter);
+        typeFilter.setBackground(rounded(Color.rgb(22, 27, 34), Color.rgb(48, 54, 61), 1, 9));
         typeFilter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 if (!updatingTypeFilter && currentCatalog != null) showCatalog(currentCatalog, false);
             }
             @Override public void onNothingSelected(AdapterView<?> parent) {}
         });
-        root.addView(typeFilter, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
+        LinearLayout.LayoutParams spinnerParams = new LinearLayout.LayoutParams(
+                0, dp(44), 1f);
+        spinnerParams.setMargins(0, 0, dp(10), 0);
+        filters.addView(typeFilter, spinnerParams);
 
         updatesOnly = new CheckBox(this);
         updatesOnly.setText("Updates only");
-        updatesOnly.setTextColor(Color.WHITE);
+        updatesOnly.setTextColor(Color.rgb(230, 237, 243));
+        updatesOnly.setTextSize(14f);
+        updatesOnly.setButtonTintList(new ColorStateList(
+                new int[][]{new int[]{android.R.attr.state_checked}, new int[]{}},
+                new int[]{Color.rgb(88, 166, 255), Color.rgb(139, 148, 158)}));
         updatesOnly.setOnCheckedChangeListener((buttonView, isChecked) -> {
             if (currentCatalog != null) showCatalog(currentCatalog, false);
         });
-        root.addView(updatesOnly, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
+        filters.addView(updatesOnly, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, dp(44)));
+
+        root.addView(filters);
+
+        LinearLayout statusRow = new LinearLayout(this);
+        statusRow.setOrientation(LinearLayout.HORIZONTAL);
+        statusRow.setGravity(Gravity.CENTER_VERTICAL);
 
         status = new TextView(this);
-        status.setTextColor(Color.LTGRAY);
-        status.setTextSize(14f);
+        status.setTextColor(Color.rgb(139, 148, 158));
+        status.setTextSize(13f);
         status.setPadding(0, dp(8), 0, dp(8));
-        root.addView(status);
+        statusRow.addView(status, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
         progress = new ProgressBar(this);
         progress.setIndeterminate(true);
-        root.addView(progress, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
+        LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(dp(26), dp(26));
+        progressParams.setMargins(dp(8), 0, 0, 0);
+        statusRow.addView(progress, progressParams);
+
+        root.addView(statusRow);
 
         ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setClipToPadding(false);
+        scroll.setPadding(0, 0, 0, dp(6));
+
         modList = new LinearLayout(this);
         modList.setOrientation(LinearLayout.VERTICAL);
         scroll.addView(modList, new ScrollView.LayoutParams(
@@ -176,6 +254,7 @@ public final class ModBrowserActivity extends Activity {
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
         setContentView(root);
+        root.requestApplyInsets();
     }
 
     private void refreshCatalog() {
@@ -335,87 +414,87 @@ public final class ModBrowserActivity extends Activity {
         String thumbnail = mod.optString("thumbnail", "").trim();
         String gameId = mod.optString("game_id", SUPPORTED_GAME_ID).trim();
         int minAppVersionCode = mod.optInt("min_app_version_code", 0);
+        int downloads = mod.optInt("downloads", 0);
         String downloadUrl = mod.optString("download_url", "").trim();
         String fileName = mod.optString("file_name", "").trim();
         String packageType = mod.optString("package_type", "").trim();
         String sha256 = mod.optString("sha256", "").trim().toLowerCase(Locale.US);
 
-        if (id.isEmpty() || name.isEmpty() || downloadUrl.isEmpty()) {
-            return;
-        }
+        if (id.isEmpty() || name.isEmpty() || downloadUrl.isEmpty()) return;
+
         boolean compatible = SUPPORTED_GAME_ID.equals(gameId)
                 && (minAppVersionCode <= 0 || BuildConfig.VERSION_CODE >= minAppVersionCode);
 
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(14), dp(12), dp(14), dp(12));
-        card.setBackgroundColor(Color.rgb(35, 41, 52));
+        card.setPadding(dp(12), dp(12), dp(12), dp(10));
+        card.setBackground(rounded(Color.rgb(22, 27, 34), Color.rgb(48, 54, 61), 1, 12));
 
-        if (!thumbnail.isEmpty()) {
-            ImageView thumbnailView = new ImageView(this);
-            thumbnailView.setAdjustViewBounds(true);
-            thumbnailView.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            thumbnailView.setContentDescription(name + " thumbnail");
-            card.addView(thumbnailView, new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT, dp(160)));
-            loadThumbnail(thumbnail, thumbnailView, id);
-        }
+        LinearLayout summary = new LinearLayout(this);
+        summary.setOrientation(LinearLayout.HORIZONTAL);
+        summary.setGravity(Gravity.TOP);
+
+        ImageView thumbnailView = new ImageView(this);
+        thumbnailView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        thumbnailView.setContentDescription(name + " thumbnail");
+        thumbnailView.setBackground(rounded(Color.rgb(33, 38, 45), Color.rgb(48, 54, 61), 1, 10));
+        thumbnailView.setClipToOutline(true);
+        LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(dp(88), dp(88));
+        imageParams.setMargins(0, 0, dp(12), 0);
+        summary.addView(thumbnailView, imageParams);
+        if (!thumbnail.isEmpty()) loadThumbnail(thumbnail, thumbnailView, id);
+
+        LinearLayout details = new LinearLayout(this);
+        details.setOrientation(LinearLayout.VERTICAL);
 
         TextView nameView = new TextView(this);
-        nameView.setText(name + (version.isEmpty() ? "" : "  v" + version));
+        nameView.setText(name);
         nameView.setTextColor(Color.WHITE);
-        nameView.setTextSize(18f);
+        nameView.setTextSize(17f);
         nameView.setTypeface(null, android.graphics.Typeface.BOLD);
-        card.addView(nameView);
+        nameView.setSingleLine(true);
+        nameView.setEllipsize(TextUtils.TruncateAt.END);
+        details.addView(nameView);
 
         TextView authorView = new TextView(this);
-        authorView.setText("by " + author);
-        authorView.setTextColor(Color.LTGRAY);
-        card.addView(authorView);
+        String byline = "by " + author + (version.isEmpty() ? "" : "  •  v" + version);
+        authorView.setText(byline);
+        authorView.setTextColor(Color.rgb(139, 148, 158));
+        authorView.setTextSize(12.5f);
+        authorView.setSingleLine(true);
+        authorView.setEllipsize(TextUtils.TruncateAt.END);
+        details.addView(authorView);
 
         if (!description.isEmpty()) {
             TextView descView = new TextView(this);
             descView.setText(description);
-            descView.setTextColor(Color.LTGRAY);
-            descView.setPadding(0, dp(6), 0, dp(8));
-            card.addView(descView);
+            descView.setTextColor(Color.rgb(201, 209, 217));
+            descView.setTextSize(13f);
+            descView.setMaxLines(2);
+            descView.setEllipsize(TextUtils.TruncateAt.END);
+            descView.setPadding(0, dp(5), 0, 0);
+            details.addView(descView);
         }
 
         TextView metaView = new TextView(this);
-        StringBuilder meta = new StringBuilder("Type: ").append(type);
-        if (!homepage.isEmpty()) meta.append("  •  Homepage available");
+        StringBuilder meta = new StringBuilder(type.isEmpty() ? "mod" : type);
+        if (downloads > 0) meta.append("  •  ").append(downloads).append(" downloads");
         if (!compatible) {
-            if (!SUPPORTED_GAME_ID.equals(gameId)) {
-                meta.append("  •  Incompatible game: ").append(gameId);
-            } else {
-                meta.append("  •  Requires app version code ").append(minAppVersionCode);
-            }
+            meta.append(!SUPPORTED_GAME_ID.equals(gameId)
+                    ? "  •  Incompatible game"
+                    : "  •  Requires newer app");
         }
         metaView.setText(meta.toString());
-        metaView.setTextColor(compatible ? Color.LTGRAY : Color.rgb(255, 180, 120));
-        card.addView(metaView);
+        metaView.setTextColor(compatible
+                ? Color.rgb(139, 148, 158)
+                : Color.rgb(255, 166, 87));
+        metaView.setTextSize(11.5f);
+        metaView.setPadding(0, dp(5), 0, 0);
+        details.addView(metaView);
 
-        if (!homepage.isEmpty()) {
-            try {
-                URL homepageUrl = new URL(homepage);
-                if ("https".equalsIgnoreCase(homepageUrl.getProtocol())) {
-                    Button homepageButton = new Button(this);
-                    homepageButton.setText("Homepage");
-                    homepageButton.setOnClickListener(v -> {
-                        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(homepage));
-                        try {
-                            startActivity(intent);
-                        } catch (ActivityNotFoundException | SecurityException e) {
-                            Log.w(TAG, "Could not open homepage for " + id, e);
-                            status.setText("No app can open this mod homepage.");
-                        }
-                    });
-                    card.addView(homepageButton);
-                }
-            } catch (Exception ignored) {
-                Log.w(TAG, "Ignoring invalid homepage URL for " + id);
-            }
-        }
+        summary.addView(details, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        card.addView(summary);
 
         String installedVersion = null;
         try {
@@ -423,6 +502,7 @@ public final class ModBrowserActivity extends Activity {
         } catch (UnsatisfiedLinkError error) {
             Log.w(TAG, "Installed mod lookup unavailable", error);
         }
+
         String downloadedVersion = getSharedPreferences(DOWNLOADED_PREFS, MODE_PRIVATE)
                 .getString(id, null);
 
@@ -430,48 +510,80 @@ public final class ModBrowserActivity extends Activity {
         if (installedVersion != null && !installedVersion.isEmpty()) {
             installedVsCatalog = compareVersions(installedVersion, version);
             TextView statusView = new TextView(this);
-            String versionState;
-            if (installedVsCatalog == 0) {
-                versionState = " • Up to date";
-            } else if (installedVsCatalog < 0) {
-                versionState = " • Update available";
-            } else if (installedVsCatalog > 0 && installedVsCatalog != 2) {
-                versionState = " • Installed version is newer";
-            } else {
-                versionState = " • Version differs";
-            }
-            statusView.setText("Installed: " + installedVersion + versionState);
-            statusView.setTextColor(installedVsCatalog == 0 ? Color.LTGRAY : Color.rgb(255, 220, 120));
+            String state;
+            if (installedVsCatalog == 0) state = "Up to date";
+            else if (installedVsCatalog < 0) state = "Update available";
+            else if (installedVsCatalog > 0 && installedVsCatalog != 2) state = "Installed version is newer";
+            else state = "Version differs";
+            statusView.setText("Installed " + installedVersion + "  •  " + state);
+            statusView.setTextColor(installedVsCatalog < 0
+                    ? Color.rgb(210, 168, 255)
+                    : Color.rgb(139, 148, 158));
+            statusView.setTextSize(12f);
+            statusView.setPadding(0, dp(8), 0, 0);
             card.addView(statusView);
         }
 
+        LinearLayout primaryActions = new LinearLayout(this);
+        primaryActions.setOrientation(LinearLayout.HORIZONTAL);
+        primaryActions.setGravity(Gravity.CENTER_VERTICAL);
+        primaryActions.setPadding(0, dp(8), 0, 0);
+
         Button install = new Button(this);
+        install.setAllCaps(false);
+        install.setMinWidth(0);
+        install.setMinimumWidth(0);
+        install.setMinHeight(dp(42));
+        install.setPadding(dp(12), 0, dp(12), 0);
         if (installedVersion != null && !installedVersion.isEmpty()) {
-            if (installedVsCatalog == 0) {
-                install.setText("Reinstall");
-            } else if (installedVsCatalog < 0) {
-                install.setText("Update " + installedVersion + " → " + version);
-            } else if (installedVsCatalog > 0 && installedVsCatalog != 2) {
-                install.setText("Install older catalog version " + version);
-            } else {
-                install.setText("Replace with catalog version " + version);
-            }
+            if (installedVsCatalog == 0) install.setText("Reinstall");
+            else if (installedVsCatalog < 0) install.setText("Update");
+            else if (installedVsCatalog > 0 && installedVsCatalog != 2) install.setText("Install older");
+            else install.setText("Replace");
         } else if (downloadedVersion != null && !downloadedVersion.isEmpty()) {
-            install.setText(downloadedVersion.equals(version)
-                    ? "Download Again"
-                    : "Download Update " + downloadedVersion + " → " + version);
+            install.setText(downloadedVersion.equals(version) ? "Download again" : "Download update");
         } else {
-            install.setText("Download & Install");
+            install.setText("Download & install");
         }
         install.setEnabled(compatible);
-        if (!compatible) {
-            install.setText("Not Compatible");
-        }
+        if (!compatible) install.setText("Not compatible");
+        styleButton(install, true);
         install.setOnClickListener(v -> {
             install.setEnabled(false);
             downloadMod(id, name, version, downloadUrl, fileName, packageType, sha256, install);
         });
-        card.addView(install);
+        primaryActions.addView(install, new LinearLayout.LayoutParams(
+                0, dp(42), 1f));
+
+        if (!homepage.isEmpty()) {
+            try {
+                URL homepageUrl = new URL(homepage);
+                if ("https".equalsIgnoreCase(homepageUrl.getProtocol())) {
+                    Button page = new Button(this);
+                    page.setText("Page");
+                    page.setAllCaps(false);
+                    page.setMinWidth(0);
+                    page.setMinimumWidth(0);
+                    page.setPadding(dp(12), 0, dp(12), 0);
+                    styleButton(page, false);
+                    page.setOnClickListener(v -> {
+                        try {
+                            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(homepage)));
+                        } catch (ActivityNotFoundException | SecurityException e) {
+                            Log.w(TAG, "Could not open homepage for " + id, e);
+                            status.setText("No app can open this mod page.");
+                        }
+                    });
+                    LinearLayout.LayoutParams pageParams = new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.WRAP_CONTENT, dp(42));
+                    pageParams.setMargins(dp(8), 0, 0, 0);
+                    primaryActions.addView(page, pageParams);
+                }
+            } catch (Exception ignored) {
+                Log.w(TAG, "Ignoring invalid homepage URL for " + id);
+            }
+        }
+        card.addView(primaryActions);
 
         if (installedVersion != null && !installedVersion.isEmpty()) {
             boolean enabled = false;
@@ -485,10 +597,15 @@ public final class ModBrowserActivity extends Activity {
 
             LinearLayout actions = new LinearLayout(this);
             actions.setOrientation(LinearLayout.HORIZONTAL);
+            actions.setPadding(0, dp(6), 0, 0);
 
             Button toggle = new Button(this);
-            toggle.setText(autoEnabled ? "Required by Dependency" : enabled ? "Disable" : "Enable");
+            toggle.setAllCaps(false);
+            toggle.setMinWidth(0);
+            toggle.setMinimumWidth(0);
+            toggle.setText(autoEnabled ? "Required" : enabled ? "Disable" : "Enable");
             toggle.setEnabled(!autoEnabled);
+            styleButton(toggle, false);
             final boolean targetEnabled = !enabled;
             toggle.setOnClickListener(v -> {
                 try {
@@ -498,52 +615,57 @@ public final class ModBrowserActivity extends Activity {
                     status.setText("Could not change mod state: native bridge unavailable");
                 }
             });
-            actions.addView(toggle, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            actions.addView(toggle, new LinearLayout.LayoutParams(0, dp(40), 1f));
 
             Button uninstall = new Button(this);
-            String uninstallBlockReason = null;
+            uninstall.setAllCaps(false);
+            uninstall.setMinWidth(0);
+            uninstall.setMinimumWidth(0);
+            String uninstallBlockReason;
             try {
                 uninstallBlockReason = BanjoSDLActivity.nativeGetModUninstallBlockReason(id);
             } catch (UnsatisfiedLinkError error) {
                 uninstallBlockReason = "Native bridge unavailable";
             }
+
             if (uninstallBlockReason != null && !uninstallBlockReason.isEmpty()) {
-                uninstall.setText("Uninstall Blocked");
+                uninstall.setText("Uninstall blocked");
                 uninstall.setEnabled(false);
-                TextView reasonView = new TextView(this);
-                reasonView.setText(uninstallBlockReason);
-                reasonView.setTextColor(Color.rgb(255, 180, 120));
-                card.addView(reasonView);
+                uninstall.setContentDescription(uninstallBlockReason);
             } else {
                 uninstall.setText("Uninstall");
                 uninstall.setOnClickListener(v -> new AlertDialog.Builder(this)
                         .setTitle("Uninstall " + name + "?")
-                        .setMessage("This removes the installed mod package from BanjoRecomp. You can download it again later.")
+                        .setMessage("This removes the installed mod package from BanjoRecomp.")
                         .setNegativeButton("Cancel", null)
                         .setPositiveButton("Uninstall", (dialog, which) -> {
                             try {
                                 boolean removed = BanjoSDLActivity.nativeUninstallMod(id);
                                 if (removed) {
-                                    getSharedPreferences(DOWNLOADED_PREFS, MODE_PRIVATE).edit().remove(id).apply();
+                                    getSharedPreferences(DOWNLOADED_PREFS, MODE_PRIVATE)
+                                            .edit().remove(id).apply();
                                     status.setText("Uninstalled " + name);
                                     refreshCatalog();
                                 } else {
-                                    status.setText("Could not uninstall " + name + ". It may now be in use or required.");
+                                    status.setText("Could not uninstall " + name + ".");
                                 }
                             } catch (UnsatisfiedLinkError error) {
                                 status.setText("Could not uninstall: native bridge unavailable");
                             }
-                        })
-                        .show());
+                        }).show());
             }
-            actions.addView(uninstall, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            styleButton(uninstall, false);
+            LinearLayout.LayoutParams uninstallParams = new LinearLayout.LayoutParams(
+                    0, dp(40), 1f);
+            uninstallParams.setMargins(dp(8), 0, 0, 0);
+            actions.addView(uninstall, uninstallParams);
             card.addView(actions);
         }
 
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
-        params.setMargins(0, 0, 0, dp(12));
+        params.setMargins(0, 0, 0, dp(10));
         modList.addView(card, params);
     }
 
@@ -747,7 +869,7 @@ public final class ModBrowserActivity extends Activity {
     }
 
     private void loadThumbnail(String url, ImageView view, String modId) {
-        executor.execute(() -> {
+        thumbnailExecutor.execute(() -> {
             try {
                 byte[] bytes = downloadBytes(url, MAX_THUMBNAIL_BYTES);
                 Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
@@ -949,6 +1071,22 @@ public final class ModBrowserActivity extends Activity {
     private static String safeMessage(Exception e) {
         String message = e.getMessage();
         return message == null || message.trim().isEmpty() ? e.getClass().getSimpleName() : message;
+    }
+
+    private GradientDrawable rounded(int fillColor, int strokeColor, int strokeDp, int radiusDp) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(fillColor);
+        drawable.setCornerRadius(dp(radiusDp));
+        drawable.setStroke(dp(strokeDp), strokeColor);
+        return drawable;
+    }
+
+    private void styleButton(Button button, boolean primary) {
+        button.setTextColor(primary ? Color.rgb(13, 17, 23) : Color.rgb(230, 237, 243));
+        button.setTextSize(13f);
+        button.setBackgroundTintList(ColorStateList.valueOf(primary
+                ? Color.rgb(88, 166, 255)
+                : Color.rgb(33, 38, 45)));
     }
 
     private int dp(int value) {
