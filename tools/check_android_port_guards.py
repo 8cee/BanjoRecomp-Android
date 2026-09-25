@@ -196,15 +196,19 @@ def main() -> int:
             "mod browser must retain dynamic type filtering and safe HTTPS homepage actions")
     require("displayAuthors" in mod_browser and "optJSONArray(\"authors\")" in mod_browser
             and "thumbnail" in mod_browser and "loadThumbnail" in mod_browser
-            and "MAX_THUMBNAIL_BYTES" in mod_browser,
-            "mod browser must retain rich author metadata and bounded HTTPS thumbnails")
+            and "MAX_THUMBNAIL_BYTES" in mod_browser and "thumbnailExecutor" in mod_browser
+            and "dp(88)" in mod_browser and "setMaxLines(2)" in mod_browser
+            and "getSystemWindowInsetRight" in mod_browser,
+            "mod browser must retain compact cards, safe system insets, and bounded async thumbnails")
     require("protected void onResume()" in mod_browser and "refreshCatalog();" in mod_browser,
             "mod browser must refresh browser labels from native state after returning")
     virtual_pad = read("android/app/src/main/java/io/github/banjorecomp/VirtualPadView.java")
     virtual_pad_native = read("src/android/virtual_pad.cpp")
     require("VirtualPadView" in save_activity and "mLayout.addView(virtualPadView" in save_activity
-            and "nativeAxis" in virtual_pad and "BTN_A" in virtual_pad and "BTN_C_UP" in virtual_pad,
-            "Android activity must retain full-screen mobile N64 touch controls")
+            and "nativeAxis" in virtual_pad and "BTN_A" in virtual_pad and "BTN_C_UP" in virtual_pad
+            and "RadialGradient" in virtual_pad and "hud_visible" in virtual_pad
+            and "layoutPill" in virtual_pad and "drawToggle" in virtual_pad,
+            "Android activity must retain DK64-style dark-glass mobile N64 touch controls")
     require("virtual_pad.cpp" in root_cmake and "virtual_pad.h" in main_cpp
             and "virtualpad::merge_input" in main_cpp and "virtualpad::notify_game_started" in main_cpp
             and "Java_io_github_banjorecomp_VirtualPadView_nativeInit" in virtual_pad_native,
