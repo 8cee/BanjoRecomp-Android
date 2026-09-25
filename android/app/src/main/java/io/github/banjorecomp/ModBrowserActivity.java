@@ -53,6 +53,14 @@ public final class ModBrowserActivity extends Activity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        if (modList != null && modList.getChildCount() > 0) {
+            refreshCatalog();
+        }
+    }
+
+    @Override
     protected void onDestroy() {
         executor.shutdownNow();
         super.onDestroy();
