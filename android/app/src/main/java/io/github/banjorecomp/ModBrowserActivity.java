@@ -32,6 +32,8 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -56,6 +58,8 @@ public final class ModBrowserActivity extends Activity {
     private EditText search;
     private JSONArray currentCatalog;
     private Spinner typeFilter;
+    private ArrayAdapter<String> typeAdapter;
+    private boolean updatingTypeFilter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -119,14 +123,13 @@ public final class ModBrowserActivity extends Activity {
                 LinearLayout.LayoutParams.WRAP_CONTENT));
 
         typeFilter = new Spinner(this);
-        String[] types = new String[] {"All", "mod", "texture", "audio", "translation", "gameplay"};
-        ArrayAdapter<String> typeAdapter = new ArrayAdapter<>(
-                this, android.R.layout.simple_spinner_item, types);
+        typeAdapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, new ArrayList<>(Collections.singletonList("All")));
         typeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         typeFilter.setAdapter(typeAdapter);
         typeFilter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                if (currentCatalog != null) showCatalog(currentCatalog, false);
+                if (!updatingTypeFilter && currentCatalog != null) showCatalog(currentCatalog, false);
             }
             @Override public void onNothingSelected(AdapterView<?> parent) {}
         });
@@ -194,6 +197,7 @@ public final class ModBrowserActivity extends Activity {
     private void showCatalog(JSONArray mods, boolean updateStatus) {
         progress.setVisibility(View.GONE);
         currentCatalog = mods;
+        updateTypeFilterOptions(mods);
         modList.removeAllViews();
         if (mods.length() == 0) {
             if (updateStatus) status.setText("The server is online, but no mods are published yet.");
@@ -225,6 +229,49 @@ public final class ModBrowserActivity extends Activity {
             status.setText(query.isEmpty()
                     ? mods.length() + (mods.length() == 1 ? " mod available" : " mods available")
                     : shown + (shown == 1 ? " matching mod" : " matching mods"));
+        }
+    }
+
+    private void updateTypeFilterOptions(JSONArray mods) {
+        if (typeFilter == null || typeAdapter == null) return;
+
+        String previousSelection = typeFilter.getSelectedItem() == null
+                ? "All" : typeFilter.getSelectedItem().toString();
+        ArrayList<String> types = new ArrayList<>();
+        for (int i = 0; i < mods.length(); i++) {
+            JSONObject mod = mods.optJSONObject(i);
+            if (mod == null) continue;
+            String type = mod.optString("type", "mod").trim();
+            if (type.isEmpty()) type = "mod";
+
+            boolean alreadyPresent = false;
+            for (String existing : types) {
+                if (existing.equalsIgnoreCase(type)) {
+                    alreadyPresent = true;
+                    break;
+                }
+            }
+            if (!alreadyPresent) types.add(type);
+        }
+        Collections.sort(types, String.CASE_INSENSITIVE_ORDER);
+
+        updatingTypeFilter = true;
+        try {
+            typeAdapter.clear();
+            typeAdapter.add("All");
+            typeAdapter.addAll(types);
+            typeAdapter.notifyDataSetChanged();
+
+            int selection = 0;
+            for (int i = 1; i < typeAdapter.getCount(); i++) {
+                if (typeAdapter.getItem(i).equalsIgnoreCase(previousSelection)) {
+                    selection = i;
+                    break;
+                }
+            }
+            typeFilter.setSelection(selection, false);
+        } finally {
+            updatingTypeFilter = false;
         }
     }
 
