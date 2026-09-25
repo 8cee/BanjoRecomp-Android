@@ -40,7 +40,8 @@ public class BanjoSDLActivity extends SDLActivity {
     private static final int REQUEST_SELECT_GPU_DRIVER = 1003;
     private static final int REQUEST_IMPORT_SAVE = 1004;
     private static final int REQUEST_EXPORT_SAVE = 1005;
-    private static final int REQUEST_SAVE_FOLDER = 1006;\n    private static final int REQUEST_MOD_SERVER = 1007;
+    private static final int REQUEST_SAVE_FOLDER = 1006;
+    private static final int REQUEST_MOD_SERVER = 1007;
     private static final String SAVE_FOLDER_PREFS = "save-folder";
     private static final String SAVE_FOLDER_URI = "tree-uri";
     private static final String SAVE_DOCUMENT_NAME = "banjo-kazooie.bin";
@@ -396,7 +397,17 @@ public class BanjoSDLActivity extends SDLActivity {
         });
     }
 
-    public void openModServerBrowser() {\n        runOnUiThread(() -> {\n            if (dualScreenStatsManager != null) {\n                dualScreenStatsManager.hideForExternalActivity();\n            }\n            Intent intent = new Intent(this, ModBrowserActivity.class);\n            startActivityForResult(intent, REQUEST_MOD_SERVER);\n        });\n    }\n\n    public void openRomFilePicker() {
+    public void openModServerBrowser() {
+        runOnUiThread(() -> {
+            if (dualScreenStatsManager != null) {
+                dualScreenStatsManager.hideForExternalActivity();
+            }
+            Intent intent = new Intent(this, ModBrowserActivity.class);
+            startActivityForResult(intent, REQUEST_MOD_SERVER);
+        });
+    }
+
+    public void openRomFilePicker() {
         runOnUiThread(() -> {
             if (dualScreenStatsManager != null) {
                 dualScreenStatsManager.hideForExternalActivity();
@@ -512,7 +523,17 @@ public class BanjoSDLActivity extends SDLActivity {
             return;
         }
 
-        if (requestCode == REQUEST_MOD_SERVER) {\n            if (resultCode == Activity.RESULT_OK && data != null) {\n                String path = data.getStringExtra(ModBrowserActivity.EXTRA_MOD_PATH);\n                if (path != null && !path.isEmpty()) {\n                    nativeOnModsSelected(new String[] { path });\n                }\n            }\n            return;\n        }\n\n        if (requestCode == REQUEST_SELECT_ROM) {
+        if (requestCode == REQUEST_MOD_SERVER) {
+            if (resultCode == Activity.RESULT_OK && data != null) {
+                String path = data.getStringExtra(ModBrowserActivity.EXTRA_MOD_PATH);
+                if (path != null && !path.isEmpty()) {
+                    nativeOnModsSelected(new String[] { path });
+                }
+            }
+            return;
+        }
+
+        if (requestCode == REQUEST_SELECT_ROM) {
             String importedPath = null;
             if (resultCode == Activity.RESULT_OK && data != null && data.getData() != null) {
                 File importedRom = copySelectedRom(data.getData());
