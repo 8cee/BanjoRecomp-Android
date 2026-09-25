@@ -283,6 +283,21 @@ Java_io_github_banjorecomp_BanjoSDLActivity_nativeSetModEnabled(
     return actual ? JNI_TRUE : JNI_FALSE;
 }
 
+extern "C" JNIEXPORT jint JNICALL
+Java_io_github_banjorecomp_BanjoSDLActivity_nativeDisableAllMods(
+    JNIEnv*, jclass) {
+    if (ultramodern::is_game_started()) return -1;
+    int disabled = 0;
+    const auto mods = recomp::mods::get_all_mod_details("bk");
+    for (const auto& mod : mods) {
+        if (recomp::mods::is_mod_enabled(mod.mod_id)) {
+            recomp::mods::enable_mod(mod.mod_id, false);
+            disabled++;
+        }
+    }
+    return disabled;
+}
+
 extern "C" JNIEXPORT jstring JNICALL
 Java_io_github_banjorecomp_BanjoSDLActivity_nativeGetModUninstallBlockReason(
     JNIEnv* env, jclass, jstring mod_id_string) {
