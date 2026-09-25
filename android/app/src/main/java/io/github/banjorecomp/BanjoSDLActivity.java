@@ -3,6 +3,7 @@ package io.github.banjorecomp;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
@@ -86,6 +87,13 @@ public class BanjoSDLActivity extends SDLActivity {
     private final ExecutorService saveIoExecutor = Executors.newSingleThreadExecutor();
     private String startupSaveStatus;
     private String startupSaveLocation;
+
+    @Override
+    public void setOrientationBis(int w, int h, boolean resizable, String hint) {
+        Log.v(TAG, "SDL orientation override: forcing SENSOR_LANDSCAPE"
+                + " (w=" + w + " h=" + h + " hint=" + hint + ")");
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
