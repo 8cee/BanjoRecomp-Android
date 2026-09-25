@@ -173,8 +173,9 @@ def main() -> int:
     require('"Homepage"' in mod_browser and "updateTypeFilterOptions" in mod_browser
             and 'Collections.sort(types, String.CASE_INSENSITIVE_ORDER)' in mod_browser
             and 'typeAdapter.add("All")' in mod_browser
-            and "ACTION_VIEW" in mod_browser,
-            "mod browser must retain dynamic type filtering and HTTPS homepage actions")
+            and "ACTION_VIEW" in mod_browser and "ActivityNotFoundException" in mod_browser
+            and '"No app can open this mod homepage."' in mod_browser,
+            "mod browser must retain dynamic type filtering and safe HTTPS homepage actions")
     require("displayAuthors" in mod_browser and "optJSONArray(\"authors\")" in mod_browser
             and "thumbnail" in mod_browser and "loadThumbnail" in mod_browser
             and "MAX_THUMBNAIL_BYTES" in mod_browser,
