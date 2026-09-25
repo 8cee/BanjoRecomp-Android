@@ -483,6 +483,47 @@ public class BanjoSDLActivity extends SDLActivity {
         launchSavePicker(intent, REQUEST_EXPORT_SAVE, "Export picker unavailable");
     }
 
+    public void restoreSaveBackup() {
+        if (saveIoExecutor.isShutdown()) {
+            nativeOnSaveOperation("Restore unavailable while app is shutting down", null);
+            return;
+        }
+        saveIoExecutor.execute(this::restoreSaveBackupInternal);
+    }
+
+    private void restoreSaveBackupInternal() {
+        File savesDir = new File(getFilesDir(), "data/saves");
+        File activeSave = new File(savesDir, RUNTIME_SAVE_NAME);
+        File backupSave = new File(savesDir, RUNTIME_SAVE_NAME + ".bak");
+        File safetySave = new File(savesDir, RUNTIME_SAVE_NAME + ".pre-restore.bak");
+
+        try {
+            if (!backupSave.isFile()) {
+                nativeOnSaveOperation("No backup save is available to restore", null);
+                return;
+            }
+            if (backupSave.length() != BANJO_SAVE_SIZE) {
+                throw new IOException("Backup has invalid size: " + backupSave.length()
+                        + " bytes (expected " + BANJO_SAVE_SIZE + ")");
+            }
+            if (activeSave.isFile()) {
+                copyFile(activeSave, safetySave);
+            }
+            boolean ok = nativeImportSave(backupSave.getAbsolutePath());
+            if (!ok) {
+                nativeOnSaveOperation("Backup restore failed", null);
+                return;
+            }
+            nativeOnSaveOperation(activeSave.isFile()
+                    ? "Backup restored successfully; previous active save preserved as " + safetySave.getName()
+                    : "Backup restored successfully", null);
+            synchronizeSaveFolder();
+        } catch (Exception e) {
+            Log.e(TAG, "Save backup restore failed", e);
+            nativeOnSaveOperation("Backup restore failed: " + e.getMessage(), null);
+        }
+    }
+
     public void openSaveFolderPicker() {
         runOnUiThread(() -> {
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
@@ -616,12 +657,16 @@ public class BanjoSDLActivity extends SDLActivity {
                     throw new IOException("Invalid Banjo save size: " + temporary.length()
                             + " bytes (expected " + BANJO_SAVE_SIZE + ")");
                 }
+                boolean backupCreated = false;
                 if (activeSave.isFile()) {
                     copyFile(activeSave, backupSave);
+                    backupCreated = true;
                 }
                 boolean ok = nativeImportSave(temporary.getAbsolutePath());
                 nativeOnSaveOperation(ok
-                        ? "Save imported successfully; previous save backed up as " + backupSave.getName()
+                        ? (backupCreated
+                                ? "Save imported successfully; previous save backed up as " + backupSave.getName()
+                                : "Save imported successfully")
                         : "Import rejected: wrong size or write failed", null);
                 if (ok) synchronizeSaveFolder();
             } else {
