@@ -43,6 +43,7 @@ def main() -> int:
     save_activity = read("android/app/src/main/java/io/github/banjorecomp/BanjoSDLActivity.java")
     save_bridge = read("src/android/save_storage_manager.cpp")
     save_runtime = read("lib/N64ModernRuntime/librecomp/src/pi.cpp")
+    game_config = read("src/game/config.cpp")
 
     require('#include "nfd.h"' in main_cpp, "main.cpp should still include NFD for desktop builds")
     require_regex(
@@ -123,6 +124,9 @@ def main() -> int:
             "diagnostics launcher shortcut and share provider must remain registered")
     require("DiagnosticsLogger.start(this)" in save_activity and 'DiagnosticsLogger.stop("onDestroy")' in save_activity,
             "diagnostics capture must remain tied to the Banjo activity lifecycle")
+    require("openDiagnostics()" in save_activity and '"android_diagnostics"' in game_config
+            and '"Logs & Diagnostics"' in game_config,
+            "Banjo settings must retain the in-app diagnostics action")
     require("ModBrowserActivity" in android_manifest and "REQUEST_MOD_SERVER" in save_activity
             and "openModServerBrowser()" in save_activity,
             "8CEE mod browser must remain wired into BanjoSDLActivity")
