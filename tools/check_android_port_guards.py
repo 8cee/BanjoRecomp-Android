@@ -141,6 +141,8 @@ def main() -> int:
     require("DOWNLOADED_PREFS" in mod_browser and "extensionFor" in mod_browser
             and '"Download Again"' in mod_browser and '"Download Update "' in mod_browser,
             "mod browser must preserve package type and track last downloaded catalog versions truthfully")
+    require("supportedPackageExtension" in mod_browser and '"Redirected to non-HTTPS URL"' in mod_browser,
+            "mod downloads must reject unsupported package types and non-HTTPS redirects")
     require("nativeGetInstalledModVersion" in main_cpp and "nativeGetInstalledModVersion" in save_activity
             and "BanjoSDLActivity.nativeGetInstalledModVersion" in mod_browser,
             "mod browser must query native installed mod versions before labeling updates")
@@ -158,6 +160,9 @@ def main() -> int:
     require("SUPPORTED_GAME_ID" in mod_browser and "min_app_version_code" in mod_browser
             and '"Not Compatible"' in mod_browser,
             "mod catalog must retain game/app compatibility gating")
+    require('"Search mods"' in mod_browser and "currentCatalog" in mod_browser
+            and '"Update available"' in mod_browser,
+            "mod browser must retain search/filter and installed update status")
     require("protected void onResume()" in mod_browser and "refreshCatalog();" in mod_browser,
             "mod browser must refresh browser labels from native state after returning")
     require('"schema": 1' in mod_catalog and '"mods": [' in mod_catalog,
