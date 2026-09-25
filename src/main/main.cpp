@@ -66,6 +66,9 @@ extern "C" int android_vulkan_smoke_main();
 #include "recompinput/input_events.h"
 #include "recompinput/recompinput.h"
 #include "recompinput/profiles.h"
+#ifdef __ANDROID__
+#include "../android/virtual_pad.h"
+#endif
 #include "banjo_config.h"
 #include "banjo_sound.h"
 #include "banjo_support.h"
@@ -1334,6 +1337,18 @@ int banjo_recomp_main(int argc, char** argv) {
         .set_rumble = recompinput::set_rumble,
         .get_connected_device_info = get_connected_device_info,
     };
+
+#ifdef __ANDROID__
+    input_callbacks.poll_input = []() {
+        recompinput::poll_inputs();
+        banjo::android::virtualpad::notify_game_started(ultramodern::is_game_started());
+    };
+    input_callbacks.get_input = [](int controller_num, uint16_t* buttons, float* x, float* y) {
+        bool result = recompinput::profiles::get_n64_input(controller_num, buttons, x, y);
+        banjo::android::virtualpad::merge_input(controller_num, buttons, x, y);
+        return result;
+    };
+#endif
 
     ultramodern::events::callbacks_t thread_callbacks{
         .vi_callback = recompinput::update_rumble,
