@@ -194,12 +194,26 @@ public final class ModBrowserActivity extends Activity {
             card.addView(descView);
         }
 
+        String installedVersion = null;
+        try {
+            installedVersion = BanjoSDLActivity.nativeGetInstalledModVersion(id);
+        } catch (UnsatisfiedLinkError error) {
+            Log.w(TAG, "Installed mod lookup unavailable", error);
+        }
         String downloadedVersion = getSharedPreferences(DOWNLOADED_PREFS, MODE_PRIVATE)
                 .getString(id, null);
         Button install = new Button(this);
-        install.setText(downloadedVersion == null ? "Download & Install"
-                : downloadedVersion.equals(version) ? "Download Again"
-                : "Download Update " + downloadedVersion + " → " + version);
+        if (installedVersion != null && !installedVersion.isEmpty()) {
+            install.setText(installedVersion.equals(version)
+                    ? "Reinstall"
+                    : "Update " + installedVersion + " → " + version);
+        } else if (downloadedVersion != null && !downloadedVersion.isEmpty()) {
+            install.setText(downloadedVersion.equals(version)
+                    ? "Download Again"
+                    : "Download Update " + downloadedVersion + " → " + version);
+        } else {
+            install.setText("Download & Install");
+        }
         install.setOnClickListener(v -> {
             install.setEnabled(false);
             downloadMod(id, name, version, downloadUrl, sha256, install);
