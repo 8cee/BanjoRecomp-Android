@@ -13,6 +13,7 @@ import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -63,6 +64,7 @@ public final class ModBrowserActivity extends Activity {
     private EditText search;
     private JSONArray currentCatalog;
     private Spinner typeFilter;
+    private CheckBox updatesOnly;
     private ArrayAdapter<String> typeAdapter;
     private boolean updatingTypeFilter;
 
@@ -139,6 +141,16 @@ public final class ModBrowserActivity extends Activity {
             @Override public void onNothingSelected(AdapterView<?> parent) {}
         });
         root.addView(typeFilter, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        updatesOnly = new CheckBox(this);
+        updatesOnly.setText("Updates only");
+        updatesOnly.setTextColor(Color.WHITE);
+        updatesOnly.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (currentCatalog != null) showCatalog(currentCatalog, false);
+        });
+        root.addView(updatesOnly, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT));
 
@@ -220,6 +232,9 @@ public final class ModBrowserActivity extends Activity {
             if (!"All".equals(selectedType) && !selectedType.equalsIgnoreCase(modType)) {
                 continue;
             }
+            if (updatesOnly != null && updatesOnly.isChecked() && !hasCatalogUpdate(mod)) {
+                continue;
+            }
             if (!query.isEmpty()) {
                 String haystack = (mod.optString("name", "") + "\n"
                         + displayAuthors(mod) + "\n"
@@ -230,10 +245,28 @@ public final class ModBrowserActivity extends Activity {
             addModCard(mod);
             shown++;
         }
-        if (updateStatus || !query.isEmpty()) {
-            status.setText(query.isEmpty()
-                    ? mods.length() + (mods.length() == 1 ? " mod available" : " mods available")
-                    : shown + (shown == 1 ? " matching mod" : " matching mods"));
+        boolean filtered = !query.isEmpty()
+                || !"All".equals(selectedType)
+                || (updatesOnly != null && updatesOnly.isChecked());
+        if (updateStatus || filtered) {
+            status.setText(filtered
+                    ? shown + (shown == 1 ? " matching mod" : " matching mods")
+                    : mods.length() + (mods.length() == 1 ? " mod available" : " mods available"));
+        }
+    }
+
+    private boolean hasCatalogUpdate(JSONObject mod) {
+        String id = mod.optString("id", "").trim();
+        String catalogVersion = mod.optString("version", "").trim();
+        if (id.isEmpty() || catalogVersion.isEmpty()) return false;
+        try {
+            String installedVersion = BanjoSDLActivity.nativeGetInstalledModVersion(id);
+            return installedVersion != null
+                    && !installedVersion.isEmpty()
+                    && !installedVersion.equals(catalogVersion);
+        } catch (UnsatisfiedLinkError error) {
+            Log.w(TAG, "Installed mod lookup unavailable while filtering updates", error);
+            return false;
         }
     }
 
