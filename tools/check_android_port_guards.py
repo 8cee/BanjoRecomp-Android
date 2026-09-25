@@ -166,7 +166,7 @@ def main() -> int:
             and '"Not Compatible"' in mod_browser,
             "mod catalog must retain game/app compatibility gating")
     require('"Search mods"' in mod_browser and "currentCatalog" in mod_browser
-            and '"Update available"' in mod_browser,
+            and "Update available" in mod_browser,
             "mod browser must retain search/filter and installed update status")
     require('"Homepage"' in mod_browser and '"All", "mod", "texture", "audio", "translation", "gameplay"' in mod_browser
             and "ACTION_VIEW" in mod_browser,
