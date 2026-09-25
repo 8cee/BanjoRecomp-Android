@@ -119,6 +119,86 @@ if have_runtime_sources; then
 fi
 
 copy_private_inputs
+
+prepare_decompressed_rom() {
+  local output="banjo.us.v10.decompressed.z64"
+  [[ -f "$output" ]] && return
+
+  local normal_rom=""
+  for candidate in     "baserom.us.v10.z64"     "banjo.us.v10.z64"     "Banjo-Kazooie (USA).z64"     "Banjo-Kazooie.z64"
+  do
+    if [[ -f "$candidate" ]]; then
+      normal_rom="$candidate"
+      break
+    fi
+  done
+
+  if [[ -z "$normal_rom" ]]; then
+    mapfile -t roms < <(find "$PRIVATE_INPUTS_DIR" . -maxdepth 1 -type f -iname '*.z64' -print 2>/dev/null | sort -u)
+    if [[ ${#roms[@]} -eq 1 ]]; then
+      normal_rom="${roms[0]}"
+    fi
+  fi
+
+  if [[ -z "$normal_rom" || ! -f "$normal_rom" ]]; then
+    echo "Runtime build needs either $output or a normal Banjo-Kazooie US v1.0 .z64 ROM." >&2
+    exit 2
+  fi
+
+  local expected_sha1="1fe1632098865f639e22c11b9a81ee8f29c75d7a"
+  local actual_sha1
+  actual_sha1="$(sha1sum "$normal_rom" | awk '{print $1}')"
+  if [[ "$actual_sha1" != "$expected_sha1" ]]; then
+    echo "Unsupported Banjo-Kazooie ROM for runtime generation." >&2
+    echo "Expected US v1.0 SHA1: $expected_sha1" >&2
+    echo "Actual SHA1:          $actual_sha1" >&2
+    exit 2
+  fi
+
+  local decomp_dir="lib/bk-decomp"
+  if [[ ! -d "$decomp_dir" ]]; then
+    echo "Banjo decomp submodule is missing: $decomp_dir" >&2
+    exit 2
+  fi
+
+  echo "Preparing decompressed Banjo-Kazooie ROM from the normal US v1.0 ROM."
+  cp "$normal_rom" "$decomp_dir/baserom.us.v10.z64"
+
+  local venv="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/banjo-decomp-venv"
+  python3 -m venv "$venv"
+  "$venv/bin/python" -m pip install --upgrade pip
+  "$venv/bin/python" -m pip install -r "$decomp_dir/requirements.txt"
+
+  (
+    cd "$decomp_dir"
+    PATH="$venv/bin:$PATH" make VERSION=us.v10
+  )
+
+  local generated=""
+  for candidate in     "$decomp_dir/build/us.v10/decompressed.us.v10.z64"     "$decomp_dir/build/us.v10/banjo.us.v10.decompressed.z64"     "$decomp_dir/decompressed.us.v10.z64"
+  do
+    if [[ -f "$candidate" ]]; then
+      generated="$candidate"
+      break
+    fi
+  done
+
+  if [[ -z "$generated" ]]; then
+    generated="$(find "$decomp_dir/build" -type f -iname '*decompressed*.z64' -print -quit 2>/dev/null || true)"
+  fi
+
+  if [[ -z "$generated" || ! -f "$generated" ]]; then
+    echo "Banjo decomp completed but no decompressed US v1.0 ROM was found." >&2
+    find "$decomp_dir/build" -maxdepth 3 -type f -iname '*.z64' -print 2>/dev/null || true
+    exit 2
+  fi
+
+  cp "$generated" "$output"
+  rm -f "$decomp_dir/baserom.us.v10.z64"
+  echo "Generated $output."
+}
+
+prepare_decompressed_rom
 build_recomp_tools
 build_file_to_c
 
@@ -133,11 +213,13 @@ if ! have_runtime_sources; then
   exit 2
 fi
 
-# Private inputs are needed only while generating sources. Remove ROM inputs named
-# by the public TOML files before Gradle packaging so they cannot accidentally be
-# bundled as APK assets.
+# Private inputs are needed only while generating sources. Remove both the normal
+# baserom and decompressed ROM before Gradle packaging so game assets cannot be
+# bundled into the APK.
 while IFS= read -r rom_input; do
   [[ -n "$rom_input" ]] && rm -f -- "$rom_input"
 done < <(rom_inputs_from_toml)
+rm -f -- baserom.us.v10.z64 banjo.us.v10.z64 "Banjo-Kazooie (USA).z64" "Banjo-Kazooie.z64"
+rm -f -- lib/bk-decomp/baserom.us.v10.z64
 
 echo "Generated runtime sources are ready."
