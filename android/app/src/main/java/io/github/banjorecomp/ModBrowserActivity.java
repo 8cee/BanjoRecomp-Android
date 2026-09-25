@@ -267,6 +267,16 @@ public final class ModBrowserActivity extends Activity {
         }
         String downloadedVersion = getSharedPreferences(DOWNLOADED_PREFS, MODE_PRIVATE)
                 .getString(id, null);
+
+        if (installedVersion != null && !installedVersion.isEmpty()) {
+            TextView statusView = new TextView(this);
+            boolean installedCurrent = installedVersion.equals(version);
+            statusView.setText("Installed: " + installedVersion
+                    + (installedCurrent ? " • Up to date" : " • Update available"));
+            statusView.setTextColor(installedCurrent ? Color.LTGRAY : Color.rgb(255, 220, 120));
+            card.addView(statusView);
+        }
+
         Button install = new Button(this);
         if (installedVersion != null && !installedVersion.isEmpty()) {
             install.setText(installedVersion.equals(version)
@@ -435,6 +445,10 @@ public final class ModBrowserActivity extends Activity {
                 throw new IllegalArgumentException("Catalog entry " + id + " has a negative min_app_version_code");
             }
             URL parsed = new URL(download);
+            if (supportedPackageExtension(download) == null) {
+                throw new IllegalArgumentException("Catalog entry " + id
+                        + " must download a .zip, .nrm, or .rtz package");
+            }
             if (!"https".equalsIgnoreCase(parsed.getProtocol())) {
                 throw new SecurityException("Catalog entry " + id + " does not use HTTPS");
             }
@@ -519,6 +533,11 @@ public final class ModBrowserActivity extends Activity {
         connection.setRequestProperty("Accept", "application/json, application/zip, application/octet-stream");
         connection.setRequestProperty("User-Agent", "8CEE-BanjoRecomp-Android");
         int response = connection.getResponseCode();
+        URL finalUrl = connection.getURL();
+        if (finalUrl == null || !"https".equalsIgnoreCase(finalUrl.getProtocol())) {
+            connection.disconnect();
+            throw new SecurityException("Redirected to non-HTTPS URL");
+        }
         if (response < 200 || response >= 300) {
             connection.disconnect();
             throw new IllegalStateException("Server returned HTTP " + response);
@@ -555,14 +574,22 @@ public final class ModBrowserActivity extends Activity {
         return result.toString();
     }
 
-    private static String extensionFor(String url) {
+    private static String supportedPackageExtension(String url) {
         try {
             String path = new URL(url).getPath().toLowerCase(Locale.US);
             if (path.endsWith(".nrm")) return ".nrm";
             if (path.endsWith(".rtz")) return ".rtz";
             if (path.endsWith(".zip")) return ".zip";
         } catch (Exception ignored) {}
-        return ".zip";
+        return null;
+    }
+
+    private static String extensionFor(String url) {
+        String extension = supportedPackageExtension(url);
+        if (extension == null) {
+            throw new IllegalArgumentException("Unsupported mod package type");
+        }
+        return extension;
     }
 
     private static String sanitizeFileName(String value) {
