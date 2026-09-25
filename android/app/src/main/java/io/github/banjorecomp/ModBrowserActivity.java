@@ -255,15 +255,26 @@ public final class ModBrowserActivity extends Activity {
         }
     }
 
+    private int compareVersions(String installedVersion, String catalogVersion) {
+        if (installedVersion == null || installedVersion.isEmpty()
+                || catalogVersion == null || catalogVersion.isEmpty()) {
+            return 2;
+        }
+        try {
+            return BanjoSDLActivity.nativeCompareVersions(installedVersion, catalogVersion);
+        } catch (UnsatisfiedLinkError error) {
+            Log.w(TAG, "Native mod version comparison unavailable", error);
+            return 2;
+        }
+    }
+
     private boolean hasCatalogUpdate(JSONObject mod) {
         String id = mod.optString("id", "").trim();
         String catalogVersion = mod.optString("version", "").trim();
         if (id.isEmpty() || catalogVersion.isEmpty()) return false;
         try {
             String installedVersion = BanjoSDLActivity.nativeGetInstalledModVersion(id);
-            return installedVersion != null
-                    && !installedVersion.isEmpty()
-                    && !installedVersion.equals(catalogVersion);
+            return compareVersions(installedVersion, catalogVersion) < 0;
         } catch (UnsatisfiedLinkError error) {
             Log.w(TAG, "Installed mod lookup unavailable while filtering updates", error);
             return false;
@@ -415,20 +426,36 @@ public final class ModBrowserActivity extends Activity {
         String downloadedVersion = getSharedPreferences(DOWNLOADED_PREFS, MODE_PRIVATE)
                 .getString(id, null);
 
+        int installedVsCatalog = 2;
         if (installedVersion != null && !installedVersion.isEmpty()) {
+            installedVsCatalog = compareVersions(installedVersion, version);
             TextView statusView = new TextView(this);
-            boolean installedCurrent = installedVersion.equals(version);
-            statusView.setText("Installed: " + installedVersion
-                    + (installedCurrent ? " • Up to date" : " • Update available"));
-            statusView.setTextColor(installedCurrent ? Color.LTGRAY : Color.rgb(255, 220, 120));
+            String versionState;
+            if (installedVsCatalog == 0) {
+                versionState = " • Up to date";
+            } else if (installedVsCatalog < 0) {
+                versionState = " • Update available";
+            } else if (installedVsCatalog > 0 && installedVsCatalog != 2) {
+                versionState = " • Installed version is newer";
+            } else {
+                versionState = " • Version differs";
+            }
+            statusView.setText("Installed: " + installedVersion + versionState);
+            statusView.setTextColor(installedVsCatalog == 0 ? Color.LTGRAY : Color.rgb(255, 220, 120));
             card.addView(statusView);
         }
 
         Button install = new Button(this);
         if (installedVersion != null && !installedVersion.isEmpty()) {
-            install.setText(installedVersion.equals(version)
-                    ? "Reinstall"
-                    : "Update " + installedVersion + " → " + version);
+            if (installedVsCatalog == 0) {
+                install.setText("Reinstall");
+            } else if (installedVsCatalog < 0) {
+                install.setText("Update " + installedVersion + " → " + version);
+            } else if (installedVsCatalog > 0 && installedVsCatalog != 2) {
+                install.setText("Install older catalog version " + version);
+            } else {
+                install.setText("Replace with catalog version " + version);
+            }
         } else if (downloadedVersion != null && !downloadedVersion.isEmpty()) {
             install.setText(downloadedVersion.equals(version)
                     ? "Download Again"
