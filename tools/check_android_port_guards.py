@@ -111,7 +111,6 @@ def main() -> int:
             "SDL orientation override must keep Banjo in sensor landscape")
     android_manifest = read("android/app/src/main/AndroidManifest.xml")
     mod_browser = read("android/app/src/main/java/io/github/banjorecomp/ModBrowserActivity.java")
-    mod_catalog = read("mod-server/index.json")
     frontend_patch = read("tools/ci/patch_android_recompfrontend.py")
     require("applicationId 'com.eightcee.bk64recomp'" in android_gradle,
             "Android applicationId must stay on the 8CEE Banjo package")
@@ -136,9 +135,11 @@ def main() -> int:
             "Banjo settings must retain the in-app diagnostics action")
     require("ModBrowserActivity" in android_manifest and "REQUEST_MOD_SERVER" in save_activity
             and "openModServerBrowser()" in save_activity,
-            "8CEE mod browser must remain wired into BanjoSDLActivity")
-    require("https://raw.githubusercontent.com/8cee/BanjoRecomp-Android/android/mod-server/index.json" in mod_browser,
-            "mod browser must use the 8CEE Banjo catalog")
+            "Thunderstore mod browser must remain wired into BanjoSDLActivity")
+    require("https://thunderstore.io/c/banjo-recompiled/api/v1/package/" in mod_browser
+            and "normalizeThunderstoreCatalog" in mod_browser
+            and '"Thunderstore Mods"' in mod_browser,
+            "mod browser must use the official Banjo-Recompiled Thunderstore catalog")
     require("CATALOG_CACHE_NAME" in mod_browser and "Offline catalog" in mod_browser
             and "parseCatalog" in mod_browser,
             "mod browser must retain validated offline catalog fallback")
@@ -191,8 +192,15 @@ def main() -> int:
             "mod browser must retain rich author metadata and bounded HTTPS thumbnails")
     require("protected void onResume()" in mod_browser and "refreshCatalog();" in mod_browser,
             "mod browser must refresh browser labels from native state after returning")
-    require('"schema": 1' in mod_catalog and '"mods": [' in mod_catalog,
-            "mod-server catalog must retain the supported schema")
+    virtual_pad = read("android/app/src/main/java/io/github/banjorecomp/VirtualPadView.java")
+    virtual_pad_native = read("src/android/virtual_pad.cpp")
+    require("VirtualPadView" in save_activity and "mLayout.addView(virtualPadView" in save_activity
+            and "nativeAxis" in virtual_pad and "BTN_A" in virtual_pad and "BTN_C_UP" in virtual_pad,
+            "Android activity must retain full-screen mobile N64 touch controls")
+    require("virtual_pad.cpp" in root_cmake and "virtual_pad.h" in main_cpp
+            and "virtualpad::merge_input" in main_cpp and "virtualpad::notify_game_started" in main_cpp
+            and "Java_io_github_banjorecomp_VirtualPadView_nativeInit" in virtual_pad_native,
+            "mobile controls must remain connected to the native N64 input path")
     require('"Browse Mods"' in frontend_patch and "openModServerBrowser" in frontend_patch,
             "Android RecompFrontend patch must expose Browse Mods")
     require("#if !defined(__ANDROID__) || defined(BANJO_ANDROID_DEV_FULL_APK)" in read("lib/RecompFrontend/recompui/src/base/ui_launcher.cpp"), "Android native RECOMP_AUTO_ROM_PATH consumption must be gated behind BANJO_ANDROID_DEV_FULL_APK")
