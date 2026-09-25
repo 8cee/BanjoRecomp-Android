@@ -138,11 +138,13 @@ def main() -> int:
     require("CATALOG_CACHE_NAME" in mod_browser and "Offline catalog" in mod_browser
             and "parseCatalog" in mod_browser,
             "mod browser must retain validated offline catalog fallback")
-    require("DOWNLOADED_PREFS" in mod_browser and "extensionFor" in mod_browser
+    require("DOWNLOADED_PREFS" in mod_browser and "resolvePackageFileName" in mod_browser
             and '"Download Again"' in mod_browser and '"Download Update "' in mod_browser,
             "mod browser must preserve package type and track last downloaded catalog versions truthfully")
-    require("supportedPackageExtension" in mod_browser and '"Redirected to non-HTTPS URL"' in mod_browser,
-            "mod downloads must reject unsupported package types and non-HTTPS redirects")
+    require("supportedPackageExtension" in mod_browser and "package_type" in mod_browser
+            and "file_name" in mod_browser and "resolvePackageExtension" in mod_browser
+            and '"Redirected to non-HTTPS URL"' in mod_browser,
+            "mod downloads must support validated explicit package metadata and reject non-HTTPS redirects")
     require("nativeGetInstalledModVersion" in main_cpp and "nativeGetInstalledModVersion" in save_activity
             and "BanjoSDLActivity.nativeGetInstalledModVersion" in mod_browser,
             "mod browser must query native installed mod versions before labeling updates")
