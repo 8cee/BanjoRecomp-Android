@@ -46,6 +46,9 @@ import java.util.Collections;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.Enumeration;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 public final class ModBrowserActivity extends Activity {
     public static final String EXTRA_MOD_PATH = "banjo_mod_server_path";
@@ -138,6 +141,34 @@ public final class ModBrowserActivity extends Activity {
 
         header.addView(heading, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        Button recover = new Button(this);
+        recover.setText("Disable mods");
+        recover.setAllCaps(false);
+        recover.setMinWidth(0);
+        recover.setMinimumWidth(0);
+        recover.setMinHeight(dp(40));
+        recover.setPadding(dp(12), 0, dp(12), 0);
+        styleButton(recover, false);
+        recover.setOnClickListener(v -> new AlertDialog.Builder(this)
+                .setTitle("Disable all installed mods?")
+                .setMessage("Use this if a mod crashes the game. The mod files stay installed and can be enabled again later.")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Disable all", (dialog, which) -> {
+                    try {
+                        int disabled = BanjoSDLActivity.nativeDisableAllMods();
+                        status.setText(disabled < 0
+                                ? "Stop the running game before disabling mods."
+                                : "Disabled " + disabled + (disabled == 1 ? " mod." : " mods."));
+                        refreshCatalog();
+                    } catch (UnsatisfiedLinkError error) {
+                        status.setText("Could not disable mods: native bridge unavailable.");
+                    }
+                }).show());
+        LinearLayout.LayoutParams recoverParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, dp(40));
+        recoverParams.setMargins(0, 0, dp(8), 0);
+        header.addView(recover, recoverParams);
 
         Button refresh = new Button(this);
         refresh.setText("Refresh");
@@ -691,6 +722,11 @@ public final class ModBrowserActivity extends Activity {
                     }
                 }
 
+                if ("zip".equalsIgnoreCase(packageType)
+                        || destination.getName().toLowerCase(Locale.US).endsWith(".zip")) {
+                    validateThunderstorePackageForAndroid(destination);
+                }
+
                 Intent result = new Intent();
                 result.putExtra(EXTRA_MOD_PATH, destination.getAbsolutePath());
                 getSharedPreferences(DOWNLOADED_PREFS, MODE_PRIVATE)
@@ -712,6 +748,43 @@ public final class ModBrowserActivity extends Activity {
                 });
             }
         });
+    }
+
+    private static void validateThunderstorePackageForAndroid(File archive) throws Exception {
+        boolean foundPayload = false;
+        ArrayList<String> nativeFiles = new ArrayList<>();
+
+        try (ZipFile zip = new ZipFile(archive)) {
+            Enumeration<? extends ZipEntry> entries = zip.entries();
+            while (entries.hasMoreElements()) {
+                ZipEntry entry = entries.nextElement();
+                if (entry.isDirectory()) continue;
+
+                String name = entry.getName().replace('\\', '/');
+                if (name.startsWith("/") || name.contains("../")) {
+                    throw new SecurityException("Unsafe path in Thunderstore package: " + name);
+                }
+
+                String lower = name.toLowerCase(Locale.US);
+                if (lower.endsWith(".nrm") || lower.endsWith(".rtz")) {
+                    foundPayload = true;
+                }
+                if (lower.endsWith(".dll") || lower.endsWith(".dylib")
+                        || lower.endsWith(".so") || lower.matches(".*\\.so\\.[0-9].*")) {
+                    nativeFiles.add(name);
+                }
+            }
+        }
+
+        if (!foundPayload) {
+            throw new IllegalArgumentException(
+                    "This Thunderstore package contains no Banjo .nrm or .rtz mod payload.");
+        }
+        if (!nativeFiles.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "This mod includes desktop native code (" + nativeFiles.get(0)
+                    + ") and is not Android-compatible yet.");
+        }
     }
 
     private static JSONObject parseCatalog(byte[] bytes) throws Exception {
