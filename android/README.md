@@ -214,3 +214,17 @@ Important app-private paths:
 - Diagnostics: `Android/data/com.eightcee.bk64recomp/files/diagnostics/` when external app storage is available, otherwise internal `files/diagnostics/`
 
 The Android app exposes save import/export through **Settings → Save Management**, remote mods through **Settings → Mods → Browse Mods**, local files through **Install Mods**, and logs through **Settings → General → Logs & Diagnostics** or the launcher long-press shortcut.
+
+## Full runtime CI build
+
+The regular `android` branch runs the lightweight probe build. A full Banjo runtime APK build is available through the `runtime-ci` branch or `workflow_dispatch` with `build_mode=runtime`.
+
+The runtime generator needs one private input file at build time:
+
+- `banjo.us.v10.decompressed.z64`
+
+By default CI expects a private repository named `8cee/BanjoRecomp-private-inputs`. Add the file at that repository root and add a repository secret named `PRIVATE_REPO_TOKEN` to this repository with read access to the private inputs repo. The workflow also supports `BANJO_ANDROID_PRIVATE_INPUTS_SSH_KEY` as a fallback.
+
+The ROM input is used only while generating `RecompiledFuncs`, RSP code, and patches. The generation script removes the ROM input before Gradle packages the APK.
+
+Run `tools/ci/setup_private_runtime_inputs.sh` locally to print the setup checklist.
