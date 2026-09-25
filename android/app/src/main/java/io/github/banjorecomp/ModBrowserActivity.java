@@ -37,6 +37,7 @@ public final class ModBrowserActivity extends Activity {
     private static final int READ_TIMEOUT_MS = 30000;
     private static final long MAX_CATALOG_BYTES = 2L * 1024L * 1024L;
     private static final long MAX_MOD_BYTES = 512L * 1024L * 1024L;
+    private static final String CATALOG_CACHE_NAME = "mod-server-catalog.json";
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private LinearLayout modList;
@@ -110,23 +111,29 @@ public final class ModBrowserActivity extends Activity {
         modList.removeAllViews();
 
         executor.execute(() -> {
+            File cache = new File(getFilesDir(), CATALOG_CACHE_NAME);
             try {
                 byte[] bytes = downloadBytes(CATALOG_URL, MAX_CATALOG_BYTES);
-                JSONObject root = new JSONObject(new String(bytes, java.nio.charset.StandardCharsets.UTF_8));
-                if (root.optInt("schema", 0) != 1) {
-                    throw new IllegalArgumentException("Unsupported catalog schema");
-                }
-                JSONArray mods = root.optJSONArray("mods");
-                if (mods == null) {
-                    throw new IllegalArgumentException("Catalog has no mods array");
-                }
+                JSONObject root = parseCatalog(bytes);
+                writeBytesAtomically(cache, bytes);
+                JSONArray mods = root.getJSONArray("mods");
                 runOnUiThread(() -> showCatalog(mods));
-            } catch (Exception e) {
-                Log.e(TAG, "Catalog refresh failed", e);
-                runOnUiThread(() -> {
-                    progress.setVisibility(View.GONE);
-                    status.setText("Could not load the mod server: " + safeMessage(e));
-                });
+            } catch (Exception networkError) {
+                Log.e(TAG, "Catalog refresh failed", networkError);
+                try {
+                    byte[] cached = readLimitedFile(cache, MAX_CATALOG_BYTES);
+                    JSONObject root = parseCatalog(cached);
+                    JSONArray mods = root.getJSONArray("mods");
+                    runOnUiThread(() -> {
+                        showCatalog(mods);
+                        status.setText("Offline catalog: showing last successful mod list.");
+                    });
+                } catch (Exception cacheError) {
+                    runOnUiThread(() -> {
+                        progress.setVisibility(View.GONE);
+                        status.setText("Could not load the mod server: " + safeMessage(networkError));
+                    });
+                }
             }
         });
     }
@@ -240,6 +247,70 @@ public final class ModBrowserActivity extends Activity {
                 });
             }
         });
+    }
+
+    private static JSONObject parseCatalog(byte[] bytes) throws Exception {
+        JSONObject root = new JSONObject(new String(bytes, java.nio.charset.StandardCharsets.UTF_8));
+        if (root.optInt("schema", 0) != 1) {
+            throw new IllegalArgumentException("Unsupported catalog schema");
+        }
+        JSONArray mods = root.optJSONArray("mods");
+        if (mods == null) {
+            throw new IllegalArgumentException("Catalog has no mods array");
+        }
+        for (int i = 0; i < mods.length(); i++) {
+            JSONObject mod = mods.optJSONObject(i);
+            if (mod == null) {
+                throw new IllegalArgumentException("Catalog entry " + i + " is not an object");
+            }
+            String id = mod.optString("id", "").trim();
+            String name = mod.optString("name", "").trim();
+            String download = mod.optString("download_url", "").trim();
+            if (id.isEmpty() || name.isEmpty() || download.isEmpty()) {
+                throw new IllegalArgumentException("Catalog entry " + i + " is missing id, name, or download_url");
+            }
+            URL parsed = new URL(download);
+            if (!"https".equalsIgnoreCase(parsed.getProtocol())) {
+                throw new SecurityException("Catalog entry " + id + " does not use HTTPS");
+            }
+            String checksum = mod.optString("sha256", "").trim();
+            if (!checksum.isEmpty() && !checksum.matches("(?i)[0-9a-f]{64}")) {
+                throw new IllegalArgumentException("Catalog entry " + id + " has an invalid SHA-256");
+            }
+        }
+        return root;
+    }
+
+    private static void writeBytesAtomically(File destination, byte[] bytes) throws Exception {
+        File parent = destination.getParentFile();
+        if (parent != null && !parent.isDirectory() && !parent.mkdirs() && !parent.isDirectory()) {
+            throw new IllegalStateException("Could not create catalog cache directory");
+        }
+        File temporary = new File(destination.getAbsolutePath() + ".tmp");
+        try (FileOutputStream output = new FileOutputStream(temporary, false)) {
+            output.write(bytes);
+            output.getFD().sync();
+        }
+        if (destination.exists() && !destination.delete()) {
+            throw new IllegalStateException("Could not replace catalog cache");
+        }
+        if (!temporary.renameTo(destination)) {
+            throw new IllegalStateException("Could not finalize catalog cache");
+        }
+    }
+
+    private static byte[] readLimitedFile(File file, long maxBytes) throws Exception {
+        if (!file.isFile()) {
+            throw new IllegalStateException("No cached catalog");
+        }
+        if (file.length() > maxBytes) {
+            throw new IllegalStateException("Cached catalog is too large");
+        }
+        try (InputStream input = new BufferedInputStream(new java.io.FileInputStream(file));
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            copyLimited(input, output, maxBytes);
+            return output.toByteArray();
+        }
     }
 
     private static byte[] downloadBytes(String url, long maxBytes) throws Exception {
