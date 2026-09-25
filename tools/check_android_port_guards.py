@@ -144,6 +144,12 @@ def main() -> int:
     require("nativeGetInstalledModVersion" in main_cpp and "nativeGetInstalledModVersion" in save_activity
             and "BanjoSDLActivity.nativeGetInstalledModVersion" in mod_browser,
             "mod browser must query native installed mod versions before labeling updates")
+    require("nativeIsModEnabled" in main_cpp and "nativeSetModEnabled" in main_cpp
+            and "nativeUninstallMod" in main_cpp and "nativeIsModAutoEnabled" in main_cpp,
+            "native mod bridge must retain enable, dependency, and uninstall operations")
+    require('"Uninstall"' in mod_browser and '"Required by Dependency"' in mod_browser
+            and "nativeSetModEnabled" in mod_browser,
+            "mod browser must expose safe installed-mod controls")
     require("SUPPORTED_GAME_ID" in mod_browser and "min_app_version_code" in mod_browser
             and '"Not Compatible"' in mod_browser,
             "mod catalog must retain game/app compatibility gating")
