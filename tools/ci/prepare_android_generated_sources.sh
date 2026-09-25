@@ -106,7 +106,7 @@ MSG
   cp -a "$PRIVATE_INPUTS_DIR"/* .
 }
 
-if [[ "$MODE" == "probe" ]]; then
+python3 tools/ci/patch_android_recompfrontend.py\n\nif [[ "$MODE" == "probe" ]]; then
   echo "Probe build selected; generated game sources are not required."
   exit 0
 fi
