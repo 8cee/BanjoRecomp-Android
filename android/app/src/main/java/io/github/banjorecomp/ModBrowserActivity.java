@@ -47,14 +47,14 @@ public final class ModBrowserActivity extends Activity {
     public static final String EXTRA_MOD_PATH = "banjo_mod_server_path";
     private static final String TAG = "BanjoModServer";
     private static final String CATALOG_URL =
-            "https://raw.githubusercontent.com/8cee/BanjoRecomp-Android/android/mod-server/index.json";
+            "https://thunderstore.io/c/banjo-recompiled/api/v1/package/";
     private static final int CONNECT_TIMEOUT_MS = 15000;
     private static final int READ_TIMEOUT_MS = 30000;
     private static final long MAX_CATALOG_BYTES = 2L * 1024L * 1024L;
     private static final long MAX_MOD_BYTES = 512L * 1024L * 1024L;
     private static final long MAX_THUMBNAIL_BYTES = 4L * 1024L * 1024L;
-    private static final String CATALOG_CACHE_NAME = "mod-server-catalog.json";
-    private static final String DOWNLOADED_PREFS = "mod-server-downloaded";
+    private static final String CATALOG_CACHE_NAME = "thunderstore-banjo-catalog.json";
+    private static final String DOWNLOADED_PREFS = "thunderstore-downloaded";
     private static final String SUPPORTED_GAME_ID = "bk";
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -100,7 +100,7 @@ public final class ModBrowserActivity extends Activity {
         header.setGravity(Gravity.CENTER_VERTICAL);
 
         TextView title = new TextView(this);
-        title.setText("8CEE Mod Server");
+        title.setText("Thunderstore Mods");
         title.setTextColor(Color.WHITE);
         title.setTextSize(24f);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
@@ -593,7 +593,12 @@ public final class ModBrowserActivity extends Activity {
     }
 
     private static JSONObject parseCatalog(byte[] bytes) throws Exception {
-        JSONObject root = new JSONObject(new String(bytes, java.nio.charset.StandardCharsets.UTF_8));
+        String text = new String(bytes, java.nio.charset.StandardCharsets.UTF_8).trim();
+        if (text.startsWith("[")) {
+            return normalizeThunderstoreCatalog(new JSONArray(text));
+        }
+
+        JSONObject root = new JSONObject(text);
         if (root.optInt("schema", 0) != 1) {
             throw new IllegalArgumentException("Unsupported catalog schema");
         }
@@ -601,6 +606,94 @@ public final class ModBrowserActivity extends Activity {
         if (mods == null) {
             throw new IllegalArgumentException("Catalog has no mods array");
         }
+        validateNormalizedCatalog(mods);
+        return root;
+    }
+
+    private static JSONObject normalizeThunderstoreCatalog(JSONArray packages) throws Exception {
+        JSONObject root = new JSONObject();
+        root.put("schema", 1);
+        root.put("game", "banjo-recompiled");
+        root.put("source", "Thunderstore");
+        JSONArray mods = new JSONArray();
+
+        for (int i = 0; i < packages.length(); i++) {
+            JSONObject pkg = packages.optJSONObject(i);
+            if (pkg == null || pkg.optBoolean("is_deprecated", false)
+                    || pkg.optBoolean("has_nsfw_content", false)) {
+                continue;
+            }
+
+            JSONArray categories = pkg.optJSONArray("categories");
+            boolean modpack = false;
+            String primaryType = "mod";
+            if (categories != null) {
+                for (int categoryIndex = 0; categoryIndex < categories.length(); categoryIndex++) {
+                    String category = categories.optString(categoryIndex, "").trim();
+                    if ("Modpacks".equalsIgnoreCase(category)) modpack = true;
+                    if (!category.isEmpty() && !"Mods".equalsIgnoreCase(category)
+                            && !"Modpacks".equalsIgnoreCase(category)) {
+                        primaryType = category.toLowerCase(Locale.US);
+                    }
+                }
+            }
+            if (modpack) continue;
+
+            JSONArray versions = pkg.optJSONArray("versions");
+            if (versions == null || versions.length() == 0) continue;
+
+            JSONObject latest = null;
+            for (int versionIndex = 0; versionIndex < versions.length(); versionIndex++) {
+                JSONObject candidate = versions.optJSONObject(versionIndex);
+                if (candidate != null && candidate.optBoolean("is_active", true)) {
+                    latest = candidate;
+                    break;
+                }
+            }
+            if (latest == null) continue;
+
+            String owner = pkg.optString("owner", "").trim();
+            String packageName = pkg.optString("name", "").trim();
+            String version = latest.optString("version_number", "").trim();
+            String download = latest.optString("download_url", "").trim();
+            if (owner.isEmpty() || packageName.isEmpty() || version.isEmpty() || download.isEmpty()) {
+                continue;
+            }
+
+            JSONObject mod = new JSONObject();
+            String stableId = owner + "-" + packageName;
+            mod.put("id", packageName);
+            mod.put("name", packageName.replace('_', ' '));
+            mod.put("author", owner);
+            JSONArray authors = new JSONArray();
+            authors.put(owner);
+            mod.put("authors", authors);
+            mod.put("version", version);
+            mod.put("description", latest.optString("description", pkg.optString("description", "")));
+            mod.put("type", primaryType);
+            mod.put("game_id", SUPPORTED_GAME_ID);
+            mod.put("min_app_version_code", 0);
+            mod.put("download_url", download);
+            mod.put("file_name", stableId + "-" + version + ".zip");
+            mod.put("package_type", "zip");
+
+            String packageUrl = pkg.optString("package_url", "").trim();
+            String website = latest.optString("website_url", "").trim();
+            mod.put("homepage", !packageUrl.isEmpty() ? packageUrl : website);
+            mod.put("thumbnail", latest.optString("icon", "").trim());
+            mod.put("thunderstore_id", stableId);
+            mod.put("downloads", latest.optInt("downloads", 0));
+            mod.put("dependencies", latest.optJSONArray("dependencies") == null
+                    ? new JSONArray() : latest.optJSONArray("dependencies"));
+            mods.put(mod);
+        }
+
+        validateNormalizedCatalog(mods);
+        root.put("mods", mods);
+        return root;
+    }
+
+    private static void validateNormalizedCatalog(JSONArray mods) throws Exception {
         for (int i = 0; i < mods.length(); i++) {
             JSONObject mod = mods.optJSONObject(i);
             if (mod == null) {
@@ -608,30 +701,19 @@ public final class ModBrowserActivity extends Activity {
             }
             String id = mod.optString("id", "").trim();
             String name = mod.optString("name", "").trim();
-            String gameId = mod.optString("game_id", SUPPORTED_GAME_ID).trim();
             String download = mod.optString("download_url", "").trim();
             String fileName = mod.optString("file_name", "").trim();
             String packageType = mod.optString("package_type", "").trim();
             if (id.isEmpty() || name.isEmpty() || download.isEmpty()) {
                 throw new IllegalArgumentException("Catalog entry " + i + " is missing id, name, or download_url");
             }
-            if (gameId.isEmpty()) {
-                throw new IllegalArgumentException("Catalog entry " + id + " has an empty game_id");
-            }
-            int minAppVersionCode = mod.optInt("min_app_version_code", 0);
-            if (minAppVersionCode < 0) {
-                throw new IllegalArgumentException("Catalog entry " + id + " has a negative min_app_version_code");
-            }
             URL parsed = new URL(download);
-            if (resolvePackageExtension(download, fileName, packageType) == null) {
-                throw new IllegalArgumentException("Catalog entry " + id
-                        + " must identify a .zip, .nrm, or .rtz package via URL, file_name, or package_type");
-            }
-            if (!fileName.isEmpty() && (fileName.contains("/") || fileName.contains("\\"))) {
-                throw new IllegalArgumentException("Catalog entry " + id + " has an unsafe file_name");
-            }
             if (!"https".equalsIgnoreCase(parsed.getProtocol())) {
                 throw new SecurityException("Catalog entry " + id + " does not use HTTPS");
+            }
+            if (resolvePackageExtension(download, fileName, packageType) == null) {
+                throw new IllegalArgumentException("Catalog entry " + id
+                        + " must identify a .zip, .nrm, or .rtz package");
             }
             String thumbnail = mod.optString("thumbnail", "").trim();
             if (!thumbnail.isEmpty()) {
@@ -640,29 +722,7 @@ public final class ModBrowserActivity extends Activity {
                     throw new SecurityException("Catalog entry " + id + " thumbnail does not use HTTPS");
                 }
             }
-            JSONArray authors = mod.optJSONArray("authors");
-            if (authors != null) {
-                for (int authorIndex = 0; authorIndex < authors.length(); authorIndex++) {
-                    Object author = authors.opt(authorIndex);
-                    if (author instanceof String) {
-                        if (((String) author).trim().isEmpty()) {
-                            throw new IllegalArgumentException("Catalog entry " + id + " has an empty author");
-                        }
-                    } else if (author instanceof JSONObject) {
-                        if (((JSONObject) author).optString("name", "").trim().isEmpty()) {
-                            throw new IllegalArgumentException("Catalog entry " + id + " has an author without a name");
-                        }
-                    } else {
-                        throw new IllegalArgumentException("Catalog entry " + id + " has an invalid authors entry");
-                    }
-                }
-            }
-            String checksum = mod.optString("sha256", "").trim();
-            if (!checksum.isEmpty() && !checksum.matches("(?i)[0-9a-f]{64}")) {
-                throw new IllegalArgumentException("Catalog entry " + id + " has an invalid SHA-256");
-            }
         }
-        return root;
     }
 
     private static String displayAuthors(JSONObject mod) {
