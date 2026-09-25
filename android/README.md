@@ -193,3 +193,24 @@ The Android Mods page keeps the normal **Install Mods** action for local ZIP/NRM
 The catalog is hosted at `mod-server/index.json` in this repository. Downloads use HTTPS, are staged in app-private cache, optionally verify SHA-256 from the catalog, and are then passed into BanjoRecomp's existing mod installer so normal manifest, package, overwrite, dependency, and deprecation checks remain authoritative.
 
 The Android package ID is `com.eightcee.bk64recomp`.
+
+
+## 8CEE Android storage layout
+
+Application ID:
+
+`com.eightcee.bk64recomp`
+
+Important app-private paths:
+
+- Active runtime save: `files/data/saves/bk.n64.us.1.0.bin`
+- Automatic pre-import backup: `files/data/saves/bk.n64.us.1.0.bin.bak`
+- Runtime data/config root: `files/data/`
+- Program assets: `files/program/`
+- Imported custom Vulkan drivers: `files/gpu-drivers/`
+- Cached remote mod catalog: `files/mod-server-catalog.json`
+- Temporary downloaded mod packages: `cache/mod-server/`
+- Local mod-import staging: `cache/mod-imports/`
+- Diagnostics: `Android/data/com.eightcee.bk64recomp/files/diagnostics/` when external app storage is available, otherwise internal `files/diagnostics/`
+
+The Android app exposes save import/export through **Settings → Save Management**, remote mods through **Settings → Mods → Browse Mods**, local files through **Install Mods**, and logs through **Settings → General → Logs & Diagnostics** or the launcher long-press shortcut.
