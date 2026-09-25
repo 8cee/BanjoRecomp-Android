@@ -304,10 +304,12 @@ Java_io_github_banjorecomp_BanjoSDLActivity_nativeUninstallMod(
         }
     }
     if (recomp::mods::is_mod_auto_enabled(mod_id)) return JNI_FALSE;
-    recomp::mods::enable_mod(mod_id, false);
 
     const std::filesystem::path path = recomp::mods::get_mod_filename(mod_id);
     if (path.empty()) return JNI_FALSE;
+
+    recomp::mods::enable_mod(mod_id, false);
+    recomp::mods::close_mods();
 
     std::error_code ec;
     if (std::filesystem::is_directory(path, ec)) {
