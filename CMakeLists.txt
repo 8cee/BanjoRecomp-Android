@@ -492,6 +492,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "Android" AND BANJO_ANDROID_RUNTIME_APK)
     target_sources(${BANJO_RECOMP_TARGET} PRIVATE
         ${CMAKE_SOURCE_DIR}/src/android/custom_driver_manager.cpp
         ${CMAKE_SOURCE_DIR}/src/android/save_storage_manager.cpp
+        ${CMAKE_SOURCE_DIR}/src/android/virtual_pad.cpp
     )
     target_compile_definitions(${BANJO_RECOMP_TARGET} PRIVATE BANJO_ANDROID_CUSTOM_DRIVER_MANAGER=1)
     if (BANJO_ANDROID_CUSTOM_VULKAN_DRIVER)
