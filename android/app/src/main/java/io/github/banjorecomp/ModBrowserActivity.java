@@ -286,6 +286,8 @@ public final class ModBrowserActivity extends Activity {
         String gameId = mod.optString("game_id", SUPPORTED_GAME_ID).trim();
         int minAppVersionCode = mod.optInt("min_app_version_code", 0);
         String downloadUrl = mod.optString("download_url", "").trim();
+        String fileName = mod.optString("file_name", "").trim();
+        String packageType = mod.optString("package_type", "").trim();
         String sha256 = mod.optString("sha256", "").trim().toLowerCase(Locale.US);
 
         if (id.isEmpty() || name.isEmpty() || downloadUrl.isEmpty()) {
@@ -386,7 +388,7 @@ public final class ModBrowserActivity extends Activity {
         }
         install.setOnClickListener(v -> {
             install.setEnabled(false);
-            downloadMod(id, name, version, downloadUrl, sha256, install);
+            downloadMod(id, name, version, downloadUrl, fileName, packageType, sha256, install);
         });
         card.addView(install);
 
@@ -464,7 +466,8 @@ public final class ModBrowserActivity extends Activity {
         modList.addView(card, params);
     }
 
-    private void downloadMod(String id, String name, String version, String downloadUrl, String expectedSha256, Button installButton) {
+    private void downloadMod(String id, String name, String version, String downloadUrl,
+                             String fileName, String packageType, String expectedSha256, Button installButton) {
         progress.setVisibility(View.VISIBLE);
         status.setText("Downloading " + name + "…");
 
@@ -475,7 +478,8 @@ public final class ModBrowserActivity extends Activity {
                 if (!root.isDirectory() && !root.mkdirs() && !root.isDirectory()) {
                     throw new IllegalStateException("Could not create download directory");
                 }
-                destination = new File(root, sanitizeFileName(id) + extensionFor(downloadUrl));
+                String resolvedFileName = resolvePackageFileName(id, downloadUrl, fileName, packageType);
+                destination = new File(root, resolvedFileName);
                 downloadToFile(downloadUrl, destination, MAX_MOD_BYTES);
                 if (!expectedSha256.isEmpty()) {
                     String actual = sha256(destination);
@@ -525,6 +529,8 @@ public final class ModBrowserActivity extends Activity {
             String name = mod.optString("name", "").trim();
             String gameId = mod.optString("game_id", SUPPORTED_GAME_ID).trim();
             String download = mod.optString("download_url", "").trim();
+            String fileName = mod.optString("file_name", "").trim();
+            String packageType = mod.optString("package_type", "").trim();
             if (id.isEmpty() || name.isEmpty() || download.isEmpty()) {
                 throw new IllegalArgumentException("Catalog entry " + i + " is missing id, name, or download_url");
             }
@@ -536,9 +542,12 @@ public final class ModBrowserActivity extends Activity {
                 throw new IllegalArgumentException("Catalog entry " + id + " has a negative min_app_version_code");
             }
             URL parsed = new URL(download);
-            if (supportedPackageExtension(download) == null) {
+            if (resolvePackageExtension(download, fileName, packageType) == null) {
                 throw new IllegalArgumentException("Catalog entry " + id
-                        + " must download a .zip, .nrm, or .rtz package");
+                        + " must identify a .zip, .nrm, or .rtz package via URL, file_name, or package_type");
+            }
+            if (!fileName.isEmpty() && (fileName.contains("/") || fileName.contains("\\"))) {
+                throw new IllegalArgumentException("Catalog entry " + id + " has an unsafe file_name");
             }
             if (!"https".equalsIgnoreCase(parsed.getProtocol())) {
                 throw new SecurityException("Catalog entry " + id + " does not use HTTPS");
@@ -665,22 +674,70 @@ public final class ModBrowserActivity extends Activity {
         return result.toString();
     }
 
-    private static String supportedPackageExtension(String url) {
+    private static String supportedPackageExtension(String value) {
+        if (value == null || value.trim().isEmpty()) return null;
+        String lower = value.trim().toLowerCase(Locale.US);
         try {
-            String path = new URL(url).getPath().toLowerCase(Locale.US);
-            if (path.endsWith(".nrm")) return ".nrm";
-            if (path.endsWith(".rtz")) return ".rtz";
-            if (path.endsWith(".zip")) return ".zip";
+            if (lower.startsWith("https://")) {
+                lower = new URL(value).getPath().toLowerCase(Locale.US);
+            }
         } catch (Exception ignored) {}
+        if (lower.endsWith(".nrm")) return ".nrm";
+        if (lower.endsWith(".rtz")) return ".rtz";
+        if (lower.endsWith(".zip")) return ".zip";
         return null;
     }
 
-    private static String extensionFor(String url) {
-        String extension = supportedPackageExtension(url);
-        if (extension == null) {
-            throw new IllegalArgumentException("Unsupported mod package type");
+    private static String packageTypeExtension(String packageType) {
+        if (packageType == null) return null;
+        switch (packageType.trim().toLowerCase(Locale.US)) {
+            case "nrm":
+            case ".nrm":
+                return ".nrm";
+            case "rtz":
+            case ".rtz":
+                return ".rtz";
+            case "zip":
+            case ".zip":
+                return ".zip";
+            default:
+                return null;
         }
-        return extension;
+    }
+
+    private static String resolvePackageExtension(String downloadUrl, String fileName, String packageType) {
+        String urlExtension = supportedPackageExtension(downloadUrl);
+        String fileExtension = supportedPackageExtension(fileName);
+        String typeExtension = packageTypeExtension(packageType);
+
+        String resolved = urlExtension != null ? urlExtension
+                : fileExtension != null ? fileExtension
+                : typeExtension;
+        if (resolved == null) return null;
+        if (urlExtension != null && !resolved.equals(urlExtension)) return null;
+        if (fileExtension != null && !resolved.equals(fileExtension)) return null;
+        if (typeExtension != null && !resolved.equals(typeExtension)) return null;
+        if (packageType != null && !packageType.trim().isEmpty() && typeExtension == null) return null;
+        return resolved;
+    }
+
+    private static String resolvePackageFileName(String id, String downloadUrl, String fileName, String packageType) {
+        String extension = resolvePackageExtension(downloadUrl, fileName, packageType);
+        if (extension == null) {
+            throw new IllegalArgumentException("Unsupported or conflicting mod package type");
+        }
+        if (fileName != null && !fileName.trim().isEmpty()) {
+            String trimmed = fileName.trim();
+            if (trimmed.contains("/") || trimmed.contains("\\")) {
+                throw new IllegalArgumentException("Unsafe mod package file_name");
+            }
+            String sanitized = sanitizeFileName(trimmed);
+            if (!sanitized.toLowerCase(Locale.US).endsWith(extension)) {
+                sanitized += extension;
+            }
+            return sanitized;
+        }
+        return sanitizeFileName(id) + extension;
     }
 
     private static String sanitizeFileName(String value) {
