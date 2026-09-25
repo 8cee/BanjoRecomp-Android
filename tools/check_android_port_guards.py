@@ -152,6 +152,8 @@ def main() -> int:
     require("nativeGetModUninstallBlockReason" in main_cpp
             and "Required by installed mod:" in main_cpp,
             "native uninstall must block removal of installed dependencies")
+    require("recomp::mods::close_mods();" in main_cpp,
+            "native uninstall must close native mod handles before deleting packages")
     require('"Uninstall"' in mod_browser and '"Required by Dependency"' in mod_browser
             and "nativeSetModEnabled" in mod_browser,
             "mod browser must expose safe installed-mod controls")
