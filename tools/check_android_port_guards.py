@@ -137,6 +137,8 @@ def main() -> int:
             "custom save folders must use persistable Storage Access Framework trees")
     require("Executors.newSingleThreadExecutor()" in save_activity,
             "save document/provider I/O must remain off the UI thread and serialized")
+    require('RUNTIME_SAVE_NAME + ".bak"' in save_activity and "copyFile(activeSave, backupSave)" in save_activity,
+            "save import must preserve a DK64-style .bak of the previous Banjo save")
     require("ultramodern::snapshot_save_file(snapshot)" in save_bridge and "ultramodern::import_save_file(data)" in save_bridge,
             "Android save JNI must use transactional runtime snapshot/import APIs")
     require("control_requested_generation" in save_runtime and "control_acknowledged_generation" in save_runtime
