@@ -39,6 +39,7 @@ public final class ModBrowserActivity extends Activity {
     private static final long MAX_MOD_BYTES = 512L * 1024L * 1024L;
     private static final String CATALOG_CACHE_NAME = "mod-server-catalog.json";
     private static final String DOWNLOADED_PREFS = "mod-server-downloaded";
+    private static final String SUPPORTED_GAME_ID = "bk";
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private LinearLayout modList;
@@ -170,12 +171,18 @@ public final class ModBrowserActivity extends Activity {
         String author = mod.optString("author", "Unknown").trim();
         String version = mod.optString("version", "").trim();
         String description = mod.optString("description", "").trim();
+        String type = mod.optString("type", "mod").trim();
+        String homepage = mod.optString("homepage", "").trim();
+        String gameId = mod.optString("game_id", SUPPORTED_GAME_ID).trim();
+        int minAppVersionCode = mod.optInt("min_app_version_code", 0);
         String downloadUrl = mod.optString("download_url", "").trim();
         String sha256 = mod.optString("sha256", "").trim().toLowerCase(Locale.US);
 
         if (id.isEmpty() || name.isEmpty() || downloadUrl.isEmpty()) {
             return;
         }
+        boolean compatible = SUPPORTED_GAME_ID.equals(gameId)
+                && (minAppVersionCode <= 0 || BuildConfig.VERSION_CODE >= minAppVersionCode);
 
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
@@ -202,6 +209,20 @@ public final class ModBrowserActivity extends Activity {
             card.addView(descView);
         }
 
+        TextView metaView = new TextView(this);
+        StringBuilder meta = new StringBuilder("Type: ").append(type);
+        if (!homepage.isEmpty()) meta.append("  •  Homepage available");
+        if (!compatible) {
+            if (!SUPPORTED_GAME_ID.equals(gameId)) {
+                meta.append("  •  Incompatible game: ").append(gameId);
+            } else {
+                meta.append("  •  Requires app version code ").append(minAppVersionCode);
+            }
+        }
+        metaView.setText(meta.toString());
+        metaView.setTextColor(compatible ? Color.LTGRAY : Color.rgb(255, 180, 120));
+        card.addView(metaView);
+
         String installedVersion = null;
         try {
             installedVersion = BanjoSDLActivity.nativeGetInstalledModVersion(id);
@@ -221,6 +242,10 @@ public final class ModBrowserActivity extends Activity {
                     : "Download Update " + downloadedVersion + " → " + version);
         } else {
             install.setText("Download & Install");
+        }
+        install.setEnabled(compatible);
+        if (!compatible) {
+            install.setText("Not Compatible");
         }
         install.setOnClickListener(v -> {
             install.setEnabled(false);
@@ -294,9 +319,17 @@ public final class ModBrowserActivity extends Activity {
             }
             String id = mod.optString("id", "").trim();
             String name = mod.optString("name", "").trim();
+            String gameId = mod.optString("game_id", SUPPORTED_GAME_ID).trim();
             String download = mod.optString("download_url", "").trim();
             if (id.isEmpty() || name.isEmpty() || download.isEmpty()) {
                 throw new IllegalArgumentException("Catalog entry " + i + " is missing id, name, or download_url");
+            }
+            if (gameId.isEmpty()) {
+                throw new IllegalArgumentException("Catalog entry " + id + " has an empty game_id");
+            }
+            int minAppVersionCode = mod.optInt("min_app_version_code", 0);
+            if (minAppVersionCode < 0) {
+                throw new IllegalArgumentException("Catalog entry " + id + " has a negative min_app_version_code");
             }
             URL parsed = new URL(download);
             if (!"https".equalsIgnoreCase(parsed.getProtocol())) {
