@@ -409,6 +409,15 @@ public class BanjoSDLActivity extends SDLActivity {
         });
     }
 
+    public void openDiagnostics() {
+        runOnUiThread(() -> {
+            if (dualScreenStatsManager != null) {
+                dualScreenStatsManager.hideForExternalActivity();
+            }
+            startActivity(new Intent(this, DiagnosticsActivity.class));
+        });
+    }
+
     public void openModServerBrowser() {
         runOnUiThread(() -> {
             if (dualScreenStatsManager != null) {
