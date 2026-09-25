@@ -188,12 +188,12 @@ def main() -> int:
             and "hasCatalogUpdate" in mod_browser and "nativeCompareVersions" in mod_browser
             and "Installed version is newer" in mod_browser,
             "mod browser must retain semantic update filtering and installed version status")
-    require('"Homepage"' in mod_browser and "updateTypeFilterOptions" in mod_browser
+    require('"Page"' in mod_browser and "updateTypeFilterOptions" in mod_browser
             and 'Collections.sort(types, String.CASE_INSENSITIVE_ORDER)' in mod_browser
             and 'typeAdapter.add("All")' in mod_browser
             and "ACTION_VIEW" in mod_browser and "ActivityNotFoundException" in mod_browser
-            and '"No app can open this mod homepage."' in mod_browser,
-            "mod browser must retain dynamic type filtering and safe HTTPS homepage actions")
+            and '"No app can open this mod page."' in mod_browser,
+            "mod browser must retain dynamic type filtering and safe HTTPS page actions")
     require("displayAuthors" in mod_browser and "optJSONArray(\"authors\")" in mod_browser
             and "thumbnail" in mod_browser and "loadThumbnail" in mod_browser
             and "MAX_THUMBNAIL_BYTES" in mod_browser and "thumbnailExecutor" in mod_browser
