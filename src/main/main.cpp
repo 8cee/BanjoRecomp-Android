@@ -264,12 +264,47 @@ Java_io_github_banjorecomp_BanjoSDLActivity_nativeSetModEnabled(
     return actual ? JNI_TRUE : JNI_FALSE;
 }
 
+extern "C" JNIEXPORT jstring JNICALL
+Java_io_github_banjorecomp_BanjoSDLActivity_nativeGetModUninstallBlockReason(
+    JNIEnv* env, jclass, jstring mod_id_string) {
+    const std::string mod_id = android_jstring_to_string(env, mod_id_string);
+    if (mod_id.empty()) return env->NewStringUTF("Invalid mod ID");
+    if (ultramodern::is_game_started()) return env->NewStringUTF("Game is already running");
+    if (recomp::mods::is_mod_auto_enabled(mod_id)) {
+        return env->NewStringUTF("Required by an enabled dependency");
+    }
+
+    const auto mods = recomp::mods::get_all_mod_details("bk");
+    for (const auto& other : mods) {
+        if (other.mod_id == mod_id) continue;
+        for (const auto& dependency : other.dependencies) {
+            if (dependency.mod_id == mod_id) {
+                const std::string reason = "Required by installed mod: " + other.display_name;
+                return env->NewStringUTF(reason.c_str());
+            }
+        }
+    }
+    return nullptr;
+}
+
 extern "C" JNIEXPORT jboolean JNICALL
 Java_io_github_banjorecomp_BanjoSDLActivity_nativeUninstallMod(
     JNIEnv* env, jclass, jstring mod_id_string) {
     if (ultramodern::is_game_started()) return JNI_FALSE;
     const std::string mod_id = android_jstring_to_string(env, mod_id_string);
     if (mod_id.empty()) return JNI_FALSE;
+
+    const auto mods = recomp::mods::get_all_mod_details("bk");
+    for (const auto& other : mods) {
+        if (other.mod_id == mod_id) continue;
+        for (const auto& dependency : other.dependencies) {
+            if (dependency.mod_id == mod_id) {
+                return JNI_FALSE;
+            }
+        }
+    }
+    if (recomp::mods::is_mod_auto_enabled(mod_id)) return JNI_FALSE;
+    recomp::mods::enable_mod(mod_id, false);
 
     const std::filesystem::path path = recomp::mods::get_mod_filename(mod_id);
     if (path.empty()) return JNI_FALSE;
