@@ -1,6 +1,7 @@
 package io.github.banjorecomp;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -44,6 +45,24 @@ public final class DiagnosticsActivity extends Activity {
             if (file != null) share(file);
         });
         root.addView(shareCurrent);
+
+        Button clearLogs = new Button(this);
+        clearLogs.setText("Clear archived logs");
+        clearLogs.setOnClickListener(v -> new AlertDialog.Builder(this)
+                .setTitle("Clear archived logs?")
+                .setMessage("This deletes previous diagnostic sessions. The current session log is kept.")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Clear", (dialog, which) -> {
+                    int deleted = DiagnosticsLogger.deleteArchivedLogs(this);
+                    refresh();
+                    if (deleted == 0) {
+                        clearLogs.setText("No archived logs to clear");
+                    } else {
+                        clearLogs.setText("Cleared " + deleted + (deleted == 1 ? " log" : " logs"));
+                    }
+                })
+                .show());
+        root.addView(clearLogs);
 
         list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
