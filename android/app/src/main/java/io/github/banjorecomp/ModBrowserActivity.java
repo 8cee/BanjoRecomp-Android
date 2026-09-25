@@ -2,6 +2,7 @@ package io.github.banjorecomp;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -358,7 +359,12 @@ public final class ModBrowserActivity extends Activity {
                     homepageButton.setText("Homepage");
                     homepageButton.setOnClickListener(v -> {
                         Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(homepage));
-                        startActivity(intent);
+                        try {
+                            startActivity(intent);
+                        } catch (ActivityNotFoundException | SecurityException e) {
+                            Log.w(TAG, "Could not open homepage for " + id, e);
+                            status.setText("No app can open this mod homepage.");
+                        }
                     });
                     card.addView(homepageButton);
                 }
