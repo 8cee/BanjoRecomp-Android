@@ -259,6 +259,18 @@ void open_android_diagnostics() {
     if (cls) env->DeleteLocalRef(cls);
     env->DeleteLocalRef(activity);
 }
+
+void restore_android_save_backup() {
+    auto* env = static_cast<JNIEnv*>(SDL_AndroidGetJNIEnv());
+    jobject activity = static_cast<jobject>(SDL_AndroidGetActivity());
+    if (!env || !activity) return;
+    jclass cls = env->GetObjectClass(activity);
+    jmethodID method = cls ? env->GetMethodID(cls, "restoreSaveBackup", "()V") : nullptr;
+    if (method) env->CallVoidMethod(activity, method);
+    if (env->ExceptionCheck()) env->ExceptionClear();
+    if (cls) env->DeleteLocalRef(cls);
+    env->DeleteLocalRef(activity);
+}
 }
 #endif
 
@@ -283,6 +295,12 @@ void banjo::init_config() {
         "Open the Android diagnostic log viewer and share recent session logs.",
         "Open...",
         [] { open_android_diagnostics(); });
+    general_config.add_action_option(
+        "android_restore_save_backup",
+        "Restore Save Backup",
+        "Restore the automatic backup created before the last save import. The current save is preserved first.",
+        "Restore",
+        [] { restore_android_save_backup(); });
 #endif
 
     auto &graphics_config = recompui::config::create_graphics_tab();
