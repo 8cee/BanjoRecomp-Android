@@ -105,6 +105,25 @@ def main() -> int:
     require("BANJO_ANDROID_BASEROM" in android_gradle and "BANJO_ANDROID_DECOMPRESSED_ROM" in android_gradle and "banjoDevRomDir" in android_gradle, "Gradle dev-ROM inputs must be overrideable without copying private files into the repo")
     require("buildConfigField 'boolean', 'BANJO_BUNDLE_DEV_ROMS', banjoBundleDevRoms.toString()" in android_gradle, "Gradle must expose the dev-ROM packaging flag to Android Java")
     require("BuildConfig.BANJO_BUNDLE_DEV_ROMS && bundledDevRom.isFile()" in read("android/app/src/main/java/io/github/banjorecomp/BanjoSDLActivity.java"), "Android Java RECOMP_AUTO_ROM_PATH setup must be gated behind BANJO_BUNDLE_DEV_ROMS")
+    android_manifest = read("android/app/src/main/AndroidManifest.xml")
+    mod_browser = read("android/app/src/main/java/io/github/banjorecomp/ModBrowserActivity.java")
+    mod_catalog = read("mod-server/index.json")
+    frontend_patch = read("tools/ci/patch_android_recompfrontend.py")
+    require("applicationId 'com.eightcee.bk64recomp'" in android_gradle,
+            "Android applicationId must stay on the 8CEE Banjo package")
+    require('android.permission.INTERNET' in android_manifest and 'android.permission.VIBRATE' in android_manifest,
+            "Android manifest must retain mod-server networking and rumble permissions")
+    require('android:appCategory="game"' in android_manifest and 'android:isGame="true"' in android_manifest,
+            "Android manifest must identify Banjo as a game")
+    require("ModBrowserActivity" in android_manifest and "REQUEST_MOD_SERVER" in save_activity
+            and "openModServerBrowser()" in save_activity,
+            "8CEE mod browser must remain wired into BanjoSDLActivity")
+    require("https://raw.githubusercontent.com/8cee/BanjoRecomp-Android/android/mod-server/index.json" in mod_browser,
+            "mod browser must use the 8CEE Banjo catalog")
+    require('"schema": 1' in mod_catalog and '"mods": [' in mod_catalog,
+            "mod-server catalog must retain the supported schema")
+    require('"Browse Mods"' in frontend_patch and "openModServerBrowser" in frontend_patch,
+            "Android RecompFrontend patch must expose Browse Mods")
     require("#if !defined(__ANDROID__) || defined(BANJO_ANDROID_DEV_FULL_APK)" in read("lib/RecompFrontend/recompui/src/base/ui_launcher.cpp"), "Android native RECOMP_AUTO_ROM_PATH consumption must be gated behind BANJO_ANDROID_DEV_FULL_APK")
     require("/usr/lib/llvm-19/bin" in android_readme and "system `gradle`" in android_readme, "Android README must document system Gradle and host LLVM path expectations")
     require("app-private" in android_readme and "APP_PROGRAM_PATH" in android_readme and "APP_FOLDER_PATH" in android_readme, "Android README must document app-private path policy")
