@@ -1,6 +1,7 @@
 package io.github.banjorecomp;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
@@ -281,21 +282,41 @@ public final class ModBrowserActivity extends Activity {
             actions.addView(toggle, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
             Button uninstall = new Button(this);
-            uninstall.setText("Uninstall");
-            uninstall.setOnClickListener(v -> {
-                try {
-                    boolean removed = BanjoSDLActivity.nativeUninstallMod(id);
-                    if (removed) {
-                        getSharedPreferences(DOWNLOADED_PREFS, MODE_PRIVATE).edit().remove(id).apply();
-                        status.setText("Uninstalled " + name);
-                        refreshCatalog();
-                    } else {
-                        status.setText("Could not uninstall " + name + ". It may be in use or required.");
-                    }
-                } catch (UnsatisfiedLinkError error) {
-                    status.setText("Could not uninstall: native bridge unavailable");
-                }
-            });
+            String uninstallBlockReason = null;
+            try {
+                uninstallBlockReason = BanjoSDLActivity.nativeGetModUninstallBlockReason(id);
+            } catch (UnsatisfiedLinkError error) {
+                uninstallBlockReason = "Native bridge unavailable";
+            }
+            if (uninstallBlockReason != null && !uninstallBlockReason.isEmpty()) {
+                uninstall.setText("Uninstall Blocked");
+                uninstall.setEnabled(false);
+                TextView reasonView = new TextView(this);
+                reasonView.setText(uninstallBlockReason);
+                reasonView.setTextColor(Color.rgb(255, 180, 120));
+                card.addView(reasonView);
+            } else {
+                uninstall.setText("Uninstall");
+                uninstall.setOnClickListener(v -> new AlertDialog.Builder(this)
+                        .setTitle("Uninstall " + name + "?")
+                        .setMessage("This removes the installed mod package from BanjoRecomp. You can download it again later.")
+                        .setNegativeButton("Cancel", null)
+                        .setPositiveButton("Uninstall", (dialog, which) -> {
+                            try {
+                                boolean removed = BanjoSDLActivity.nativeUninstallMod(id);
+                                if (removed) {
+                                    getSharedPreferences(DOWNLOADED_PREFS, MODE_PRIVATE).edit().remove(id).apply();
+                                    status.setText("Uninstalled " + name);
+                                    refreshCatalog();
+                                } else {
+                                    status.setText("Could not uninstall " + name + ". It may now be in use or required.");
+                                }
+                            } catch (UnsatisfiedLinkError error) {
+                                status.setText("Could not uninstall: native bridge unavailable");
+                            }
+                        })
+                        .show());
+            }
             actions.addView(uninstall, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
             card.addView(actions);
         }
