@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Banjo Recompiled</string>
+    <string name="diagnostics_title">Logs &amp; Diagnostics</string>
+    <string name="diag_shortcut_short">Diagnostic Logs</string>
+    <string name="diag_shortcut_long">Game Logs &amp; Diagnostics</string>
+</resources>
