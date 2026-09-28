@@ -11,6 +11,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStreamReader;
+import java.io.RandomAccessFile;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
@@ -60,6 +61,32 @@ public final class DiagnosticsLogger {
     }
 
     private DiagnosticsLogger() {}
+
+    public static boolean previousSessionHadNativeCrash(Context context) {
+        try {
+            List<File> logs = listLogFiles(context);
+            if (logs.isEmpty()) return false;
+            File latest = logs.get(0);
+            long length = latest.length();
+            long start = Math.max(0L, length - 128L * 1024L);
+            try (RandomAccessFile input = new RandomAccessFile(latest, "r")) {
+                input.seek(start);
+                byte[] bytes = new byte[(int)(length - start)];
+                input.readFully(bytes);
+                String tail = new String(bytes, StandardCharsets.UTF_8);
+                boolean fatal = tail.contains("Fatal signal")
+                        || tail.contains("SIGSEGV")
+                        || tail.contains("SIGABRT");
+                if (fatal) {
+                    Log.w(TAG, "Previous diagnostics session ended in a native crash: " + latest.getName());
+                }
+                return fatal;
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Could not inspect previous diagnostics session", t);
+            return false;
+        }
+    }
 
     public static void start(Context context) {
         Context app = context.getApplicationContext();
