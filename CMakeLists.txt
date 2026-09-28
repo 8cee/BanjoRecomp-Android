@@ -137,6 +137,15 @@ endif()
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/lib/N64ModernRuntime)
 
+if (CMAKE_SYSTEM_NAME MATCHES "Android")
+    # Android forbids long-lived RWX JIT mappings on modern releases.
+    # Code mods use the N64Recomp live recompiler, so force SLJIT's W^X
+    # allocator (RW while generating, then RX while executing).
+    target_compile_definitions(LiveRecomp PRIVATE
+        SLJIT_WX_EXECUTABLE_ALLOCATOR=1
+    )
+endif()
+
 target_include_directories(rt64 PRIVATE ${CMAKE_BINARY_DIR}/rt64/src)
 
 # RecompiledFuncs - Library containing the primary recompiler output
