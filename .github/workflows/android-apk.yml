@@ -166,6 +166,19 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
+      - name: Apply Android code-mod runtime fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_file="android/patches/n64modernruntime-mods.android.cpp"
+          target_file="lib/N64ModernRuntime/librecomp/src/mods.cpp"
+          test -f "$source_file"
+          test -f "$target_file"
+          cp "$source_file" "$target_file"
+          grep -q "BANJOMOD shadowed patch page" "$target_file"
+          grep -q "recompiler_output->code != nullptr" "$target_file"
+          echo "Applied DK64-derived Android code-mod memory fixes"
+
       - name: Select build parameters
         id: params
         shell: bash
