@@ -748,9 +748,22 @@ public final class ModBrowserActivity extends Activity {
                     if ("zip".equalsIgnoreCase(packageType)
                             || destination.getName().toLowerCase(Locale.US).endsWith(".zip")) {
                         validateThunderstorePackageForAndroid(destination);
+                        ArrayList<File> payloads = extractThunderstorePayloads(
+                                destination, root, id, version);
+                        if (payloads.isEmpty()) {
+                            throw new IllegalArgumentException(
+                                    "Thunderstore package contains no installable Banjo payload.");
+                        }
+                        for (File payload : payloads) {
+                            downloadedFiles.add(payload);
+                            paths.add(payload.getAbsolutePath());
+                            Log.i(TAG, "Prepared Thunderstore payload " + payload.getName()
+                                    + " from " + destination.getName());
+                        }
+                    } else {
+                        paths.add(destination.getAbsolutePath());
                     }
 
-                    paths.add(destination.getAbsolutePath());
                     getSharedPreferences(DOWNLOADED_PREFS, MODE_PRIVATE)
                             .edit().putString(id, version).apply();
                 }
@@ -851,6 +864,78 @@ public final class ModBrowserActivity extends Activity {
         if (thunderstoreId.isEmpty()) return "";
         String prefix = thunderstoreId + "-";
         return dependency.startsWith(prefix) ? dependency.substring(prefix.length()).trim() : "";
+    }
+
+    private static ArrayList<File> extractThunderstorePayloads(
+            File archive, File outputRoot, String packageId, String version) throws Exception {
+        ArrayList<File> payloads = new ArrayList<>();
+        String packagePrefix = sanitizeFileName(packageId);
+        if (version != null && !version.trim().isEmpty()) {
+            packagePrefix += "-" + sanitizeFileName(version.trim());
+        }
+
+        long totalBytes = 0L;
+        byte[] buffer = new byte[64 * 1024];
+
+        try (ZipFile zip = new ZipFile(archive)) {
+            Enumeration<? extends ZipEntry> entries = zip.entries();
+            while (entries.hasMoreElements()) {
+                ZipEntry entry = entries.nextElement();
+                if (entry.isDirectory()) continue;
+
+                String entryName = entry.getName().replace('\\', '/');
+                if (entryName.startsWith("/") || entryName.contains("../")) {
+                    throw new SecurityException("Unsafe path in Thunderstore package: " + entryName);
+                }
+
+                String lower = entryName.toLowerCase(Locale.US);
+                if (!lower.endsWith(".nrm") && !lower.endsWith(".rtz")) {
+                    continue;
+                }
+
+                String baseName = entryName;
+                int slash = baseName.lastIndexOf('/');
+                if (slash >= 0) baseName = baseName.substring(slash + 1);
+                baseName = sanitizeFileName(baseName);
+                if (baseName.isEmpty()) {
+                    throw new IllegalArgumentException("Invalid Banjo payload filename in package");
+                }
+
+                File output = new File(outputRoot, packagePrefix + "-" + baseName);
+                long entryBytes = 0L;
+                try (BufferedInputStream input = new BufferedInputStream(zip.getInputStream(entry));
+                     FileOutputStream outputStream = new FileOutputStream(output, false)) {
+                    int read;
+                    while ((read = input.read(buffer)) != -1) {
+                        entryBytes += read;
+                        totalBytes += read;
+                        if (entryBytes > MAX_MOD_BYTES || totalBytes > MAX_MOD_BYTES) {
+                            throw new IllegalArgumentException(
+                                    "Extracted Thunderstore payload exceeds size limit");
+                        }
+                        outputStream.write(buffer, 0, read);
+                    }
+                    outputStream.flush();
+                } catch (Exception e) {
+                    if (output.exists() && !output.delete()) {
+                        Log.w(TAG, "Could not delete incomplete payload " + output);
+                    }
+                    throw e;
+                }
+
+                if (output.length() <= 0L) {
+                    if (!output.delete() && output.exists()) {
+                        Log.w(TAG, "Could not delete empty payload " + output);
+                    }
+                    throw new IllegalArgumentException(
+                            "Thunderstore package contains an empty Banjo payload: " + entryName);
+                }
+
+                payloads.add(output);
+            }
+        }
+
+        return payloads;
     }
 
     private static void validateThunderstorePackageForAndroid(File archive) throws Exception {
