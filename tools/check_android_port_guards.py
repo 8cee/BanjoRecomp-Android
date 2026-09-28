@@ -168,6 +168,15 @@ def main() -> int:
             and "desktop native code" in mod_browser
             and "ZipFile" in mod_browser,
             "Thunderstore installs must reject desktop-native packages on Android")
+    require("resolveInstallOrder" in mod_browser
+            and "findThunderstoreDependency" in mod_browser
+            and "EXTRA_MOD_PATHS" in mod_browser
+            and "getStringArrayExtra(ModBrowserActivity.EXTRA_MOD_PATHS)" in save_activity,
+            "Thunderstore installs must resolve dependencies and pass the full install batch")
+    require("log_android_mod_inventory_once" in main_cpp
+            and '"BanjoRecomp/Mods"' in main_cpp
+            and '"Game start mod inventory:"' in main_cpp,
+            "Android diagnostics must log installed/enabled mods before game runtime")
     require("nativeDisableAllMods" in main_cpp and "nativeDisableAllMods" in save_activity
             and '"Disable mods"' in mod_browser,
             "Android mod browser must retain disable-all recovery for crashy mods")
