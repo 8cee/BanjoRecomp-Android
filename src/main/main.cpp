@@ -255,7 +255,6 @@ static void recover_android_mods_after_crash_if_requested() {
     SDL_setenv("BANJO_ANDROID_RECOVER_MODS_AFTER_CRASH", "0", true);
 }
 
-#if defined(__ANDROID__)
 static void log_android_mod_inventory_once(bool game_started) {
     static bool logged_for_current_game = false;
     if (!game_started) {
