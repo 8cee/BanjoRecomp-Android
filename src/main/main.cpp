@@ -215,6 +215,45 @@ void push_android_mod_drop_events(JNIEnv* env, jobjectArray paths) {
 }
 } // namespace
 
+#if defined(__ANDROID__)
+static void log_android_mod_inventory_once(bool game_started) {
+    static bool logged_for_current_game = false;
+    if (!game_started) {
+        logged_for_current_game = false;
+        return;
+    }
+    if (logged_for_current_game) return;
+    logged_for_current_game = true;
+
+    const auto mods = recomp::mods::get_all_mod_details("bk");
+    int enabled_count = 0;
+    for (const auto& mod : mods) {
+        const bool enabled = recomp::mods::is_mod_enabled(mod.mod_id);
+        const bool automatic = recomp::mods::is_mod_auto_enabled(mod.mod_id);
+        if (enabled || automatic) enabled_count++;
+    }
+
+    __android_log_print(ANDROID_LOG_INFO, "BanjoRecomp/Mods",
+        "Game start mod inventory: installed=%zu enabled_or_required=%d",
+        mods.size(), enabled_count);
+
+    for (const auto& mod : mods) {
+        const bool enabled = recomp::mods::is_mod_enabled(mod.mod_id);
+        const bool automatic = recomp::mods::is_mod_auto_enabled(mod.mod_id);
+        __android_log_print((enabled || automatic) ? ANDROID_LOG_WARN : ANDROID_LOG_INFO,
+            "BanjoRecomp/Mods",
+            "mod id=%s name=%s version=%s enabled=%d auto=%d dependencies=%zu file=%s",
+            mod.mod_id.c_str(),
+            mod.display_name.c_str(),
+            mod.version.to_string().c_str(),
+            enabled ? 1 : 0,
+            automatic ? 1 : 0,
+            mod.dependencies.size(),
+            recomp::mods::get_mod_filename(mod.mod_id).string().c_str());
+    }
+}
+#endif
+
 extern "C" JNIEXPORT void JNICALL
 Java_io_github_banjorecomp_BanjoSDLActivity_nativeOnModsSelected(JNIEnv* env, jclass, jobjectArray paths) {
     push_android_mod_drop_events(env, paths);
@@ -1356,7 +1395,9 @@ int banjo_recomp_main(int argc, char** argv) {
 #ifdef __ANDROID__
     input_callbacks.poll_input = []() {
         recompinput::poll_inputs();
-        banjo::android::virtualpad::notify_game_started(ultramodern::is_game_started());
+        const bool game_started = ultramodern::is_game_started();
+        log_android_mod_inventory_once(game_started);
+        banjo::android::virtualpad::notify_game_started(game_started);
     };
     input_callbacks.get_input = [](int controller_num, uint16_t* buttons, float* x, float* y) {
         bool result = recompinput::profiles::get_n64_input(controller_num, buttons, x, y);
