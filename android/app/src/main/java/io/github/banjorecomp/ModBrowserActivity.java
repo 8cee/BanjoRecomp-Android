@@ -52,6 +52,7 @@ import java.util.zip.ZipFile;
 
 public final class ModBrowserActivity extends Activity {
     public static final String EXTRA_MOD_PATH = "banjo_mod_server_path";
+    public static final String EXTRA_MOD_PATHS = "banjo_mod_server_paths";
     private static final String TAG = "BanjoModServer";
     private static final String CATALOG_URL =
             "https://thunderstore.io/c/banjo-recompiled/api/v1/package/";
@@ -581,7 +582,7 @@ public final class ModBrowserActivity extends Activity {
         styleButton(install, true);
         install.setOnClickListener(v -> {
             install.setEnabled(false);
-            downloadMod(id, name, version, downloadUrl, fileName, packageType, sha256, install);
+            downloadMod(mod, install);
         });
         primaryActions.addView(install, new LinearLayout.LayoutParams(
                 0, dp(42), 1f));
@@ -700,54 +701,154 @@ public final class ModBrowserActivity extends Activity {
         modList.addView(card, params);
     }
 
-    private void downloadMod(String id, String name, String version, String downloadUrl,
-                             String fileName, String packageType, String expectedSha256, Button installButton) {
+    private void downloadMod(JSONObject selectedMod, Button installButton) {
+        final String selectedName = selectedMod.optString("name",
+                selectedMod.optString("id", "mod")).trim();
         progress.setVisibility(View.VISIBLE);
-        status.setText("Downloading " + name + "…");
+        status.setText("Resolving dependencies for " + selectedName + "…");
 
         executor.execute(() -> {
-            File destination = null;
+            ArrayList<File> downloadedFiles = new ArrayList<>();
             try {
+                ArrayList<JSONObject> installOrder = new ArrayList<>();
+                resolveInstallOrder(selectedMod, installOrder, new HashSet<>(), new HashSet<>());
+
                 File root = new File(getCacheDir(), "mod-server");
                 if (!root.isDirectory() && !root.mkdirs() && !root.isDirectory()) {
                     throw new IllegalStateException("Could not create download directory");
                 }
-                String resolvedFileName = resolvePackageFileName(id, downloadUrl, fileName, packageType);
-                destination = new File(root, resolvedFileName);
-                downloadToFile(downloadUrl, destination, MAX_MOD_BYTES);
-                if (!expectedSha256.isEmpty()) {
-                    String actual = sha256(destination);
-                    if (!actual.equals(expectedSha256)) {
-                        throw new SecurityException("SHA-256 mismatch");
+
+                ArrayList<String> paths = new ArrayList<>();
+                for (JSONObject mod : installOrder) {
+                    String id = mod.optString("id", "").trim();
+                    String name = mod.optString("name", id).trim();
+                    String version = mod.optString("version", "").trim();
+                    String downloadUrl = mod.optString("download_url", "").trim();
+                    String fileName = mod.optString("file_name", "").trim();
+                    String packageType = mod.optString("package_type", "").trim();
+                    String expectedSha256 = mod.optString("sha256", "").trim().toLowerCase(Locale.US);
+
+                    runOnUiThread(() -> status.setText(
+                            "Downloading " + name + " (" + (paths.size() + 1) + "/" + installOrder.size() + ")…"));
+
+                    String resolvedFileName = resolvePackageFileName(id, downloadUrl, fileName, packageType);
+                    File destination = new File(root, resolvedFileName);
+                    downloadToFile(downloadUrl, destination, MAX_MOD_BYTES);
+                    downloadedFiles.add(destination);
+
+                    if (!expectedSha256.isEmpty()) {
+                        String actual = sha256(destination);
+                        if (!actual.equals(expectedSha256)) {
+                            throw new SecurityException("SHA-256 mismatch for " + name);
+                        }
                     }
+
+                    if ("zip".equalsIgnoreCase(packageType)
+                            || destination.getName().toLowerCase(Locale.US).endsWith(".zip")) {
+                        validateThunderstorePackageForAndroid(destination);
+                    }
+
+                    paths.add(destination.getAbsolutePath());
+                    getSharedPreferences(DOWNLOADED_PREFS, MODE_PRIVATE)
+                            .edit().putString(id, version).apply();
                 }
 
-                if ("zip".equalsIgnoreCase(packageType)
-                        || destination.getName().toLowerCase(Locale.US).endsWith(".zip")) {
-                    validateThunderstorePackageForAndroid(destination);
+                if (paths.isEmpty()) {
+                    throw new IllegalStateException("Nothing to install");
                 }
 
                 Intent result = new Intent();
-                result.putExtra(EXTRA_MOD_PATH, destination.getAbsolutePath());
-                getSharedPreferences(DOWNLOADED_PREFS, MODE_PRIVATE)
-                        .edit().putString(id, version).apply();
+                result.putExtra(EXTRA_MOD_PATH, paths.get(paths.size() - 1));
+                result.putExtra(EXTRA_MOD_PATHS, paths.toArray(new String[0]));
                 setResult(Activity.RESULT_OK, result);
                 runOnUiThread(() -> {
-                    status.setText("Downloaded " + name + ". Opening the Banjo mod installer…");
+                    int dependencyCount = Math.max(0, paths.size() - 1);
+                    status.setText(dependencyCount == 0
+                            ? "Downloaded " + selectedName + ". Opening the Banjo mod installer…"
+                            : "Downloaded " + selectedName + " plus " + dependencyCount
+                                    + (dependencyCount == 1 ? " dependency." : " dependencies.")
+                                    + " Opening the Banjo mod installer…");
                     finish();
                 });
             } catch (Exception e) {
                 Log.e(TAG, "Mod download failed", e);
-                if (destination != null && destination.exists() && !destination.delete()) {
-                    Log.w(TAG, "Could not delete failed download " + destination);
+                for (File file : downloadedFiles) {
+                    if (file != null && file.exists() && !file.delete()) {
+                        Log.w(TAG, "Could not delete failed download " + file);
+                    }
                 }
                 runOnUiThread(() -> {
                     progress.setVisibility(View.GONE);
                     installButton.setEnabled(true);
-                    status.setText("Download failed: " + safeMessage(e));
+                    status.setText("Install blocked: " + safeMessage(e));
                 });
             }
         });
+    }
+
+    private void resolveInstallOrder(JSONObject mod, ArrayList<JSONObject> order,
+                                     Set<String> visiting, Set<String> resolved) throws Exception {
+        String key = mod.optString("thunderstore_id", mod.optString("id", "")).trim();
+        if (key.isEmpty()) throw new IllegalArgumentException("Mod has no stable package id");
+        if (resolved.contains(key)) return;
+        if (!visiting.add(key)) {
+            throw new IllegalArgumentException("Circular Thunderstore dependency involving " + key);
+        }
+
+        JSONArray dependencies = mod.optJSONArray("dependencies");
+        if (dependencies != null) {
+            for (int i = 0; i < dependencies.length(); i++) {
+                String dependency = dependencies.optString(i, "").trim();
+                if (dependency.isEmpty()) continue;
+
+                JSONObject dependencyMod = findThunderstoreDependency(dependency);
+                if (dependencyMod == null) {
+                    throw new IllegalArgumentException(
+                            "Required dependency is unavailable: " + dependency);
+                }
+
+                String dependencyId = dependencyMod.optString("id", "").trim();
+                String installedVersion = null;
+                try {
+                    installedVersion = BanjoSDLActivity.nativeGetInstalledModVersion(dependencyId);
+                } catch (UnsatisfiedLinkError error) {
+                    Log.w(TAG, "Installed dependency lookup unavailable for " + dependencyId, error);
+                }
+
+                String requiredVersion = dependencyRequiredVersion(dependency, dependencyMod);
+                if (installedVersion == null || installedVersion.isEmpty()
+                        || requiredVersion.isEmpty()
+                        || compareVersions(installedVersion, requiredVersion) < 0) {
+                    resolveInstallOrder(dependencyMod, order, visiting, resolved);
+                }
+            }
+        }
+
+        visiting.remove(key);
+        resolved.add(key);
+        order.add(mod);
+    }
+
+    private JSONObject findThunderstoreDependency(String dependency) {
+        JSONArray catalog = currentCatalog;
+        if (catalog == null) return null;
+        for (int i = 0; i < catalog.length(); i++) {
+            JSONObject candidate = catalog.optJSONObject(i);
+            if (candidate == null) continue;
+            String thunderstoreId = candidate.optString("thunderstore_id", "").trim();
+            if (!thunderstoreId.isEmpty()
+                    && (dependency.equals(thunderstoreId) || dependency.startsWith(thunderstoreId + "-"))) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private static String dependencyRequiredVersion(String dependency, JSONObject dependencyMod) {
+        String thunderstoreId = dependencyMod.optString("thunderstore_id", "").trim();
+        if (thunderstoreId.isEmpty()) return "";
+        String prefix = thunderstoreId + "-";
+        return dependency.startsWith(prefix) ? dependency.substring(prefix.length()).trim() : "";
     }
 
     private static void validateThunderstorePackageForAndroid(File archive) throws Exception {
