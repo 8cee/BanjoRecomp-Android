@@ -99,6 +99,7 @@ public class BanjoSDLActivity extends SDLActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        boolean recoverModsAfterCrash = DiagnosticsLogger.previousSessionHadNativeCrash(this);
         DiagnosticsLogger.start(this);
         currentActivity = this;
         lastPostedDualScreenGameplayActive = null;
@@ -136,6 +137,11 @@ public class BanjoSDLActivity extends SDLActivity {
 
         nativeSetenv("APP_PROGRAM_PATH", programDir.getAbsolutePath());
         nativeSetenv("APP_FOLDER_PATH", appDataDir.getAbsolutePath());
+        nativeSetenv("BANJO_ANDROID_RECOVER_MODS_AFTER_CRASH", recoverModsAfterCrash ? "1" : "0");
+        if (recoverModsAfterCrash) {
+            Log.w(TAG, "Previous native crash detected; Banjo mods will be disabled before game start");
+            DiagnosticsLogger.mark("Previous native crash detected; automatic mod safe-mode recovery requested");
+        }
         setupGpuDriverEnvironment(gpuDriverRoot, gpuDriverTmp, getIntent());
         File bundledDevRom = new File(programDir, "dev-roms/baserom.us.v10.z64");
         File cachedRom = findLatestCachedRom();
