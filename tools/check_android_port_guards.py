@@ -175,7 +175,7 @@ def main() -> int:
             "Thunderstore installs must resolve dependencies and pass the full install batch")
     require("log_android_mod_inventory_once" in main_cpp
             and '"BanjoRecomp/Mods"' in main_cpp
-            and '"Game start mod inventory:"' in main_cpp,
+            and "Game start mod inventory:" in main_cpp,
             "Android diagnostics must log installed/enabled mods before game runtime")
     require("nativeDisableAllMods" in main_cpp and "nativeDisableAllMods" in save_activity
             and '"Disable mods"' in mod_browser,
