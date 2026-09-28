@@ -604,9 +604,14 @@ public class BanjoSDLActivity extends SDLActivity {
 
         if (requestCode == REQUEST_MOD_SERVER) {
             if (resultCode == Activity.RESULT_OK && data != null) {
-                String path = data.getStringExtra(ModBrowserActivity.EXTRA_MOD_PATH);
-                if (path != null && !path.isEmpty()) {
-                    nativeOnModsSelected(new String[] { path });
+                String[] paths = data.getStringArrayExtra(ModBrowserActivity.EXTRA_MOD_PATHS);
+                if (paths != null && paths.length > 0) {
+                    nativeOnModsSelected(paths);
+                } else {
+                    String path = data.getStringExtra(ModBrowserActivity.EXTRA_MOD_PATH);
+                    if (path != null && !path.isEmpty()) {
+                        nativeOnModsSelected(new String[] { path });
+                    }
                 }
             }
             return;
