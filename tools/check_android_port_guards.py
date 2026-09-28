@@ -180,11 +180,6 @@ def main() -> int:
     require("nativeDisableAllMods" in main_cpp and "nativeDisableAllMods" in save_activity
             and '"Disable mods"' in mod_browser,
             "Android mod browser must retain disable-all recovery for crashy mods")
-    require("previousSessionHadNativeCrash" in diagnostics_logger
-            and "BANJO_ANDROID_RECOVER_MODS_AFTER_CRASH" in save_activity
-            and "recover_android_mods_after_crash_if_requested" in main_cpp
-            and "Automatic mod safe mode complete:" in main_cpp,
-            "Android must automatically disable enabled mods after a prior native crash")
     require("nativeIsModEnabled" in main_cpp and "nativeSetModEnabled" in main_cpp
             and "nativeUninstallMod" in main_cpp and "nativeIsModAutoEnabled" in main_cpp,
             "native mod bridge must retain enable, dependency, and uninstall operations")

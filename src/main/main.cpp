@@ -216,45 +216,6 @@ void push_android_mod_drop_events(JNIEnv* env, jobjectArray paths) {
 } // namespace
 
 #if defined(__ANDROID__)
-static void recover_android_mods_after_crash_if_requested() {
-    const char* recover_env = std::getenv("BANJO_ANDROID_RECOVER_MODS_AFTER_CRASH");
-    if (recover_env == nullptr || std::strcmp(recover_env, "1") != 0) {
-        return;
-    }
-
-    __android_log_print(ANDROID_LOG_WARN, "BanjoRecomp/Mods",
-        "Previous native crash detected; entering automatic mod safe mode");
-
-    try {
-        recomp::mods::scan_mods();
-        const auto mods = recomp::mods::get_all_mod_details("bk");
-        int disabled = 0;
-        for (const auto& mod : mods) {
-            if (recomp::mods::is_mod_enabled(mod.mod_id)) {
-                __android_log_print(ANDROID_LOG_WARN, "BanjoRecomp/Mods",
-                    "Safe mode disabling mod id=%s name=%s version=%s file=%s",
-                    mod.mod_id.c_str(),
-                    mod.display_name.c_str(),
-                    mod.version.to_string().c_str(),
-                    recomp::mods::get_mod_filename(mod.mod_id).string().c_str());
-                recomp::mods::enable_mod(mod.mod_id, false);
-                disabled++;
-            }
-        }
-        __android_log_print(ANDROID_LOG_WARN, "BanjoRecomp/Mods",
-            "Automatic mod safe mode complete: installed=%zu disabled=%d",
-            mods.size(), disabled);
-    } catch (const std::exception& e) {
-        __android_log_print(ANDROID_LOG_ERROR, "BanjoRecomp/Mods",
-            "Automatic mod safe mode failed: %s", e.what());
-    } catch (...) {
-        __android_log_print(ANDROID_LOG_ERROR, "BanjoRecomp/Mods",
-            "Automatic mod safe mode failed with unknown exception");
-    }
-
-    SDL_setenv("BANJO_ANDROID_RECOVER_MODS_AFTER_CRASH", "0", true);
-}
-
 static void log_android_mod_inventory_once(bool game_started) {
     static bool logged_for_current_game = false;
     if (!game_started) {
@@ -1470,10 +1431,6 @@ int banjo_recomp_main(int argc, char** argv) {
 
     // Register the .rtz texture pack file format with the previous content type as its only allowed content type.
     recomp::mods::register_mod_container_type("rtz", std::vector{ texture_pack_content_type_id }, false);
-
-#if defined(__ANDROID__)
-    recover_android_mods_after_crash_if_requested();
-#endif
 
     recomp::start({
         .project_version = project_version,
